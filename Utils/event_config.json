@@ -1,20 +1,20 @@
 {
     "event": {
-        "conference_name": "ICRA",
-        "conference_full_name": "IEEE Conference on Robotics and Automation",
-        "race_number": "27TH",
+        "conference_name": "IV",
+        "conference_full_name": "IEEE Intelligent Vehicles Symposium",
+        "race_number": "28TH",
         "year": "2026",
-        "venue_name": "VIECON - Vienna Congress & Convention Center",
-        "location": "Wien, Vienna, Austria",
-        "venue_url": "https://www.messecongress.at/",
-        "conference_url": "https://2026.ieee-icra.org/",
-        "conference_logo": "images/ICRA2026.png",
+        "venue_name": "Detroit Marriott at the Renaissance Center",
+        "location": "Detroit, MI, United States",
+        "venue_url": "https://www.marriott.com/en-us/hotels/dtwdt-detroit-marriott-at-the-renaissance-center/overview/?scid=f2ae0541-1279-4f24-b197-a979c79310b0",
+        "conference_url": "https://ieee-iv.org/2026/",
+        "conference_logo": "images/IV2026.png",
         "contact_email": "roboracer2026icra@tuwien.ac.at",
-        "cname": "icra2026-race.roboracer.ai",
-        "conference_dates_display": "June 1st - 5th"
+        "cname": "iv2026-race.roboracer.ai",
+        "conference_dates_display": "June 22nd - 25th"
     },
     "dates": {
-        "race_day": "2026-06-04",
+        "race_day": "2026-06-24",
         "offsets": {
             "qualification": -1,
             "team_training": -2,
@@ -38,8 +38,8 @@
         "video_link": ""
     },
     "registration": {
-        "status": "open",
-        "form_link": "https://selapp.lanthan.at/?selection=icra2026",
+        "status": "closed",
+        "form_link": "",
         "hide_participants": true
     },
     "results": {
@@ -47,7 +47,7 @@
         "bracket_link": "",
         "youtube_stream_id": "KLOceDeegVs",
         "twitch_parent_domains": [
-            "icra2026-race.f1tenth.org",
+            "iv2026-race.f1tenth.org",
             "localhost"
         ],
         "show_stream_placeholder": true,
@@ -56,10 +56,10 @@
         "results_placeholder_text": "Results will be posted after the competition."
     },
     "sim_racing": {
-        "enabled": true,
-        "edition": "5th",
-        "website_url": "https://autodrive-ecosystem.github.io/competitions/roboracer-sim-racing-icra-2026/",
-        "registration_url": "https://autodrive-ecosystem.github.io/competitions/roboracer-sim-racing-icra-2026/#registration",
-        "timeline_url": "https://autodrive-ecosystem.github.io/competitions/roboracer-sim-racing-icra-2026/#timeline"
+        "enabled": false,
+        "edition": "6th",
+        "website_url": "https://autodrive-ecosystem.github.io/competitions/roboracer-sim-racing-iv-2026/",
+        "registration_url": "https://autodrive-ecosystem.github.io/competitions/roboracer-sim-racing-iv-2026/#registration",
+        "timeline_url": "https://autodrive-ecosystem.github.io/competitions/roboracer-sim-racing-iv-2026/#timeline"
     }
 }

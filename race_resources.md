@@ -1,5 +1,5 @@
 ---
-title: Roboracer ICRA 2026 Race Resources
+title: Roboracer IV 2026 Race Resources
 short_title: Race Resources
 layout: page
 section: race
