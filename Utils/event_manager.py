@@ -111,6 +111,40 @@ def get_default_config() -> dict:
             "registration_url": "",
             "timeline_url": "",
         },
+        "organizers": [
+            {
+                "name": "Rahul Mangharam",
+                "image": "images/organizer/rahul.jpeg",
+                "profile_url": "https://www.seas.upenn.edu/~rahulm/",
+                "title": "Associate Professor",
+                "department": "Department of Electrical and Systems Engineering",
+                "institution": "University of Pennsylvania",
+            },
+            {
+                "name": "Venkat Krovi",
+                "image": "images/organizer/venkat.jpeg",
+                "profile_url": "https://www.clemson.edu/cecas/departments/automotive-engineering/people/Venkat%20Krovi.html",
+                "title": "Michelin Chair Professor",
+                "department": "Department of Automotive Engineering",
+                "institution": "Clemson University",
+            },
+            {
+                "name": "Radu Grosu",
+                "image": "images/organizer/Radu.png",
+                "profile_url": "https://tiss.tuwien.ac.at/person/248818.html",
+                "title": "Full Professor and Head of Research Unit",
+                "department": "Research Unit of Cyber-Physical Systems",
+                "institution": "TU Wien (Vienna University of Technology)",
+            },
+            {
+                "name": "Ezio Bartocci",
+                "image": "images/organizer/Ezio.jpg",
+                "profile_url": "https://tiss.tuwien.ac.at/person/251490.html",
+                "title": "Full Professor",
+                "department": "Research Unit of Cyber-Physical Systems",
+                "institution": "TU Wien (Vienna University of Technology)",
+            },
+        ],
     }
 
 
@@ -242,6 +276,199 @@ class ScaleDialog:
         self.dialog.destroy()
 
 
+class OrganizerEditDialog:
+    """Dialog to add or edit an organizer."""
+
+    def __init__(self, parent, title: str, organizer: dict | None = None):
+        self.result = None
+
+        # Create dialog window
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title(title)
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+
+        # Dark theme styling
+        self.dialog.configure(bg="#1e1e2e")
+
+        # Center the dialog
+        self.dialog.geometry("500x350")
+        self.dialog.resizable(False, False)
+
+        # Main frame
+        main_frame = tk.Frame(self.dialog, bg="#1e1e2e")
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Entry fields
+        self.entries = {}
+        fields = [
+            ("name", "Name:"),
+            ("profile_url", "Profile URL:"),
+            ("title", "Title:"),
+            ("department", "Department:"),
+            ("institution", "Institution:"),
+        ]
+
+        for i, (field_key, label_text) in enumerate(fields):
+            tk.Label(
+                main_frame,
+                text=label_text,
+                bg="#1e1e2e",
+                fg="#cdd6f4",
+                font=("Ubuntu", 10),
+            ).grid(row=i, column=0, sticky="w", pady=5)
+
+            entry = tk.Entry(
+                main_frame,
+                width=45,
+                bg="#2a2a3c",
+                fg="#cdd6f4",
+                insertbackground="#cdd6f4",
+                relief=tk.FLAT,
+                font=("Ubuntu", 10),
+                highlightthickness=1,
+                highlightcolor="#89b4fa",
+                highlightbackground="#45475a",
+            )
+            entry.grid(row=i, column=1, sticky="ew", pady=5, ipady=4)
+            self.entries[field_key] = entry
+
+        # Image field with browse button
+        row = len(fields)
+        tk.Label(
+            main_frame,
+            text="Image:",
+            bg="#1e1e2e",
+            fg="#cdd6f4",
+            font=("Ubuntu", 10),
+        ).grid(row=row, column=0, sticky="w", pady=5)
+
+        image_frame = tk.Frame(main_frame, bg="#1e1e2e")
+        image_frame.grid(row=row, column=1, sticky="ew", pady=5)
+
+        self.image_entry = tk.Entry(
+            image_frame,
+            width=35,
+            bg="#2a2a3c",
+            fg="#cdd6f4",
+            insertbackground="#cdd6f4",
+            relief=tk.FLAT,
+            font=("Ubuntu", 10),
+            highlightthickness=1,
+            highlightcolor="#89b4fa",
+            highlightbackground="#45475a",
+        )
+        self.image_entry.pack(side="left", fill="x", expand=True, ipady=4)
+
+        browse_btn = tk.Button(
+            image_frame,
+            text="Browse",
+            command=self.browse_image,
+            bg="#45475a",
+            fg="#cdd6f4",
+            font=("Ubuntu", 9),
+            relief=tk.FLAT,
+            padx=10,
+            cursor="hand2",
+        )
+        browse_btn.pack(side="left", padx=(5, 0))
+
+        # Populate fields if editing
+        if organizer:
+            for key, entry in self.entries.items():
+                entry.insert(0, organizer.get(key, ""))
+            self.image_entry.insert(0, organizer.get("image", ""))
+
+        # Buttons frame
+        btn_frame = tk.Frame(self.dialog, bg="#1e1e2e")
+        btn_frame.pack(pady=15)
+
+        save_btn = tk.Button(
+            btn_frame,
+            text="Save",
+            command=self.on_save,
+            bg="#89b4fa",
+            fg="#1e1e2e",
+            font=("Ubuntu", 10, "bold"),
+            relief=tk.FLAT,
+            padx=20,
+            pady=6,
+            cursor="hand2",
+        )
+        save_btn.pack(side="left", padx=5)
+
+        cancel_btn = tk.Button(
+            btn_frame,
+            text="Cancel",
+            command=self.on_cancel,
+            bg="#45475a",
+            fg="#cdd6f4",
+            font=("Ubuntu", 10),
+            relief=tk.FLAT,
+            padx=20,
+            pady=6,
+            cursor="hand2",
+        )
+        cancel_btn.pack(side="left", padx=5)
+
+        # Bind keys
+        self.dialog.bind("<Return>", lambda e: self.on_save())
+        self.dialog.bind("<Escape>", lambda e: self.on_cancel())
+
+        # Focus first entry
+        self.entries["name"].focus_set()
+
+        # Wait for dialog to close
+        parent.wait_window(self.dialog)
+
+    def browse_image(self):
+        """Open file dialog to select organizer image."""
+        initial_dir = PROJECT_ROOT / "images" / "organizer"
+        if not initial_dir.exists():
+            initial_dir = PROJECT_ROOT / "images"
+
+        filepath = filedialog.askopenfilename(
+            title="Select Organizer Image",
+            initialdir=initial_dir,
+            filetypes=[
+                ("Image files", "*.png *.jpg *.jpeg *.webp *.gif"),
+                ("All files", "*.*"),
+            ],
+        )
+
+        if filepath:
+            try:
+                rel_path = Path(filepath).relative_to(PROJECT_ROOT)
+                self.image_entry.delete(0, tk.END)
+                self.image_entry.insert(0, str(rel_path))
+            except ValueError:
+                messagebox.showwarning(
+                    "File Location",
+                    "Please select an image from within the project directory.",
+                )
+
+    def on_save(self):
+        """Validate and save organizer data."""
+        name = self.entries["name"].get().strip()
+        if not name:
+            messagebox.showerror("Validation Error", "Name is required.")
+            return
+
+        self.result = {
+            "name": name,
+            "profile_url": self.entries["profile_url"].get().strip(),
+            "title": self.entries["title"].get().strip(),
+            "department": self.entries["department"].get().strip(),
+            "institution": self.entries["institution"].get().strip(),
+            "image": self.image_entry.get().strip(),
+        }
+        self.dialog.destroy()
+
+    def on_cancel(self):
+        self.result = None
+        self.dialog.destroy()
+
+
 class EventManagerApp:
     """Main application class for the Event Manager GUI."""
 
@@ -267,6 +494,7 @@ class EventManagerApp:
         self.create_orientations_tab()
         self.create_registration_tab()
         self.create_results_tab()
+        self.create_organizers_tab()
         self.create_registrants_tab()
 
         # Create bottom button frame
@@ -851,6 +1079,142 @@ class EventManagerApp:
             frame, "Results Placeholder Text:", row, results.get("results_placeholder_text", "Results will be posted after the competition.")
         )
 
+    def create_organizers_tab(self) -> None:
+        """Create the Organizers tab."""
+        frame = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(frame, text="Organizers")
+
+        frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(1, weight=1)
+
+        # Header label
+        ttk.Label(
+            frame,
+            text="Manage event organizers (displayed on homepage):",
+            font=("Ubuntu", 10),
+        ).grid(row=0, column=0, sticky=tk.W, padx=5, pady=(5, 10))
+
+        # Treeview for organizers list
+        tree_frame = ttk.Frame(frame)
+        tree_frame.grid(row=1, column=0, sticky=tk.NSEW, padx=5, pady=5)
+        tree_frame.columnconfigure(0, weight=1)
+        tree_frame.rowconfigure(0, weight=1)
+
+        columns = ("#", "Name", "Institution")
+        self.organizers_tree = ttk.Treeview(
+            tree_frame, columns=columns, show="headings", height=12
+        )
+        self.organizers_tree.heading("#", text="#", anchor="w")
+        self.organizers_tree.heading("Name", text="Name", anchor="w")
+        self.organizers_tree.heading("Institution", text="Institution", anchor="w")
+        self.organizers_tree.column("#", width=40, minwidth=30)
+        self.organizers_tree.column("Name", width=200, minwidth=150)
+        self.organizers_tree.column("Institution", width=300, minwidth=200)
+
+        self.organizers_tree.grid(row=0, column=0, sticky=tk.NSEW)
+
+        # Scrollbar for treeview
+        tree_scroll = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.organizers_tree.yview)
+        tree_scroll.grid(row=0, column=1, sticky=tk.NS)
+        self.organizers_tree.configure(yscrollcommand=tree_scroll.set)
+
+        # Double-click to edit
+        self.organizers_tree.bind("<Double-1>", lambda e: self.edit_organizer())
+
+        # Buttons frame
+        btn_frame = ttk.Frame(frame)
+        btn_frame.grid(row=2, column=0, sticky=tk.W, padx=5, pady=10)
+
+        ttk.Button(btn_frame, text="Add New", command=self.add_organizer).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Edit Selected", command=self.edit_organizer).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Delete", command=self.delete_organizer).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Move Up", command=self.move_organizer_up).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Move Down", command=self.move_organizer_down).pack(side=tk.LEFT, padx=5)
+
+        # Store organizers data
+        self.organizers_data = self.config.get("organizers", []).copy()
+
+        # Populate treeview
+        self.refresh_organizers_tree()
+
+    def refresh_organizers_tree(self) -> None:
+        """Refresh the organizers treeview with current data."""
+        self.organizers_tree.delete(*self.organizers_tree.get_children())
+        for i, org in enumerate(self.organizers_data, 1):
+            self.organizers_tree.insert("", tk.END, values=(i, org.get("name", ""), org.get("institution", "")))
+
+    def add_organizer(self) -> None:
+        """Open dialog to add a new organizer."""
+        dialog = OrganizerEditDialog(self.root, "Add Organizer")
+        if dialog.result:
+            self.organizers_data.append(dialog.result)
+            self.refresh_organizers_tree()
+
+    def edit_organizer(self) -> None:
+        """Open dialog to edit the selected organizer."""
+        selection = self.organizers_tree.selection()
+        if not selection:
+            messagebox.showwarning("Warning", "Please select an organizer to edit.")
+            return
+
+        item = selection[0]
+        index = self.organizers_tree.index(item)
+        organizer = self.organizers_data[index]
+
+        dialog = OrganizerEditDialog(self.root, "Edit Organizer", organizer)
+        if dialog.result:
+            self.organizers_data[index] = dialog.result
+            self.refresh_organizers_tree()
+
+    def delete_organizer(self) -> None:
+        """Delete the selected organizer."""
+        selection = self.organizers_tree.selection()
+        if not selection:
+            messagebox.showwarning("Warning", "Please select an organizer to delete.")
+            return
+
+        if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this organizer?"):
+            item = selection[0]
+            index = self.organizers_tree.index(item)
+            del self.organizers_data[index]
+            self.refresh_organizers_tree()
+
+    def move_organizer_up(self) -> None:
+        """Move the selected organizer up in the list."""
+        selection = self.organizers_tree.selection()
+        if not selection:
+            return
+
+        item = selection[0]
+        index = self.organizers_tree.index(item)
+        if index > 0:
+            self.organizers_data[index], self.organizers_data[index - 1] = (
+                self.organizers_data[index - 1],
+                self.organizers_data[index],
+            )
+            self.refresh_organizers_tree()
+            # Reselect the moved item
+            children = self.organizers_tree.get_children()
+            self.organizers_tree.selection_set(children[index - 1])
+
+    def move_organizer_down(self) -> None:
+        """Move the selected organizer down in the list."""
+        selection = self.organizers_tree.selection()
+        if not selection:
+            return
+
+        item = selection[0]
+        index = self.organizers_tree.index(item)
+        if index < len(self.organizers_data) - 1:
+            self.organizers_data[index], self.organizers_data[index + 1] = (
+                self.organizers_data[index + 1],
+                self.organizers_data[index],
+            )
+            self.refresh_organizers_tree()
+            # Reselect the moved item
+            children = self.organizers_tree.get_children()
+            self.organizers_tree.selection_set(children[index + 1])
+
     def create_registrants_tab(self) -> None:
         """Create the Registrants tab."""
         frame = ttk.Frame(self.notebook, padding=10)
@@ -1414,6 +1778,7 @@ class EventManagerApp:
                 "registration_url": self.sim_registration_entry.get().strip(),
                 "timeline_url": self.sim_timeline_entry.get().strip(),
             },
+            "organizers": self.organizers_data,
         }
 
     def save_config(self) -> None:
@@ -1474,6 +1839,7 @@ class RepositoryUpdater:
         self.reg = config.get("registration", {})
         self.results = config.get("results", {})
         self.sim = config.get("sim_racing", {})
+        self.organizers = config.get("organizers", [])
 
         # Calculate dates
         self.dates = calculate_dates(
@@ -1596,6 +1962,43 @@ class RepositoryUpdater:
         except Exception as e:
             return f"Error: {e}"
 
+    def _generate_organizers_html(self) -> str:
+        """Generate HTML for organizers grid from config data."""
+        if not self.organizers:
+            return ""
+
+        html_parts = []
+        # Process organizers in groups of 4 (one row)
+        for i in range(0, len(self.organizers), 4):
+            row_organizers = self.organizers[i:i + 4]
+
+            # Images row
+            images_html = '<div class="box alt">\n\t\t\t\t\t<div class="row gtr-50 gtr-uniform">\n'
+            for org in row_organizers:
+                image = org.get("image", "")
+                images_html += f'\t\t\t\t\t\t<div class="col-2"><span class="image fit"><img src="{image}"\n\t\t\t\t\t\t\t\t\talt="" /></span></div>\n'
+            images_html += '\t\t\t\t\t</div>\n\t\t\t\t</div>'
+            html_parts.append(images_html)
+
+            # Details row
+            details_html = '<div class="box alt">\n\t\t\t\t\t<div class="row gtr-50 gtr-uniform">\n'
+            for org in row_organizers:
+                name = org.get("name", "")
+                profile_url = org.get("profile_url", "")
+                title = org.get("title", "")
+                department = org.get("department", "")
+                institution = org.get("institution", "")
+                details_html += f'''\t\t\t\t\t\t<div class="col-2" , align="center">
+							<b><a href="{profile_url}">{name}</a></b>
+							<h6>{title}</h6>
+							<h6>{department}</h6>
+							<h6>{institution}</h6>
+						</div>\n'''
+            details_html += '\t\t\t\t\t</div>\n\t\t\t\t</div>'
+            html_parts.append(details_html)
+
+        return '\n\n\t\t\t\t'.join(html_parts)
+
     def _update_index_html(self, content: str) -> str:
         """Update index.html using placeholder markers."""
         race_num = self.event.get("race_number", "")
@@ -1639,6 +2042,11 @@ class RepositoryUpdater:
 								Sim Racing League website</a>.
 						</p>'''
             content = self.replace_placeholder(content, "SIM_RACING_PARAGRAPH", sim_paragraph)
+
+        # Update organizers grid
+        organizers_html = self._generate_organizers_html()
+        if organizers_html:
+            content = self.replace_placeholder(content, "ORGANIZERS_GRID", organizers_html)
 
         return content
 

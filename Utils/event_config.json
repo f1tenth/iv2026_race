@@ -61,5 +61,47 @@
         "website_url": "https://autodrive-ecosystem.github.io/competitions/roboracer-sim-racing-iv-2026/",
         "registration_url": "https://autodrive-ecosystem.github.io/competitions/roboracer-sim-racing-iv-2026/#registration",
         "timeline_url": "https://autodrive-ecosystem.github.io/competitions/roboracer-sim-racing-iv-2026/#timeline"
-    }
+    },
+    "organizers": [
+        {
+            "name": "Rahul Mangharam",
+            "image": "images/organizer/rahul.jpeg",
+            "profile_url": "https://www.seas.upenn.edu/~rahulm/",
+            "title": "Associate Professor",
+            "department": "Department of Electrical and Systems Engineering",
+            "institution": "University of Pennsylvania"
+        },
+        {
+            "name": "Venkat Krovi",
+            "image": "images/organizer/venkat.jpeg",
+            "profile_url": "https://www.clemson.edu/cecas/departments/automotive-engineering/people/Venkat%20Krovi.html",
+            "title": "Michelin Chair Professor",
+            "department": "Department of Automotive Engineering",
+            "institution": "Clemson University"
+        },
+        {
+            "name": "Ahmad Amine",
+            "image": "images/organizer/Ahmad.jpg",
+            "profile_url": "https://ahmadamine998.github.io/",
+            "title": "Ph.D. Candidate",
+            "department": "Department of Electrical and Systems Engineering",
+            "institution": "University of Pennsylvania"
+        },
+        {
+            "name": "Chinmay Samak",
+            "image": "images/organizer/Chinmay_Samak.jpg",
+            "profile_url": "mailto:csamak@clemson.edu",
+            "title": "Ph.D. Candidate",
+            "department": "Department of Automotive Engineering",
+            "institution": "Clemson University - ICAR"
+        },
+        {
+            "name": "Tanmay Samak",
+            "image": "images/organizer/Tanmay_Samak.jpg",
+            "profile_url": "mailto:tsamak@clemson.edu",
+            "title": "Ph.D. Candidate",
+            "department": "Department of Automotive Engineering",
+            "institution": "Clemson University - ICAR"
+        }
+    ]
 }
