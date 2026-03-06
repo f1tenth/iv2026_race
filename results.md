@@ -16,7 +16,7 @@ section: stream
         channel: "roboracer_ai",
         // video: "<video ID>",
         // collection: "<collection ID>",
-        parent: <!-- TWITCH_PARENTS -->["icra2026-race.f1tenth.org", "localhost"]<!-- /TWITCH_PARENTS -->
+        parent: <!-- TWITCH_PARENTS -->["iv2026-race.f1tenth.org", "localhost"]<!-- /TWITCH_PARENTS -->
     };
     var player = new Twitch.Player("1", options);
     player.setVolume(0.5);

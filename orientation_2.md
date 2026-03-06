@@ -5,7 +5,7 @@ layout: page
 section: race
 ---
 <center>
-	<h2> Roboracer <!-- CONF_WITH_YEAR -->ICRA 2026<!-- /CONF_WITH_YEAR --> Orientation 2 Material</h2>
+	<h2> Roboracer <!-- CONF_WITH_YEAR -->IV 2026<!-- /CONF_WITH_YEAR --> Orientation 2 Material</h2>
 </center>
 
 <center>
