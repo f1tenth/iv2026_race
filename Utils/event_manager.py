@@ -1859,6 +1859,11 @@ class RepositoryUpdater:
         replacement = f'<!-- {name} -->{value}<!-- /{name} -->'
         return re.sub(pattern, replacement, content, flags=re.DOTALL)
 
+    @staticmethod
+    def _clean_html(html: str) -> str:
+        """Strip leading whitespace from each line so tabs don't trigger Markdown code blocks."""
+        return '\n'.join(line.lstrip() for line in html.strip().split('\n'))
+
     @property
     def conf_with_year(self) -> str:
         """Conference acronym with year (e.g., 'ICRA 2025')."""
@@ -1884,12 +1889,12 @@ class RepositoryUpdater:
         # Update HTML files
         html_files = [
             "index.html",
-            "timeline.html",
-            "registration.html",
-            "results.html",
-            "roboracer_resources.html",
-            "orientation_1.html",
-            "orientation_2.html",
+            "timeline.md",
+            "registration.md",
+            "results.md",
+            "roboracer_resources.md",
+            "orientation_1.md",
+            "orientation_2.md",
         ]
 
         for filename in html_files:
@@ -1943,15 +1948,15 @@ class RepositoryUpdater:
             # File-specific updates
             if filepath.name == "index.html":
                 content = self._update_index_html(content)
-            elif filepath.name == "timeline.html":
+            elif filepath.name == "timeline.md":
                 content = self._update_timeline_html(content)
-            elif filepath.name == "registration.html":
+            elif filepath.name == "registration.md":
                 content = self._update_registration_html(content)
-            elif filepath.name == "results.html":
+            elif filepath.name == "results.md":
                 content = self._update_results_html(content)
-            elif filepath.name == "orientation_1.html":
+            elif filepath.name == "orientation_1.md":
                 content = self._update_orientation1_html(content)
-            elif filepath.name == "orientation_2.html":
+            elif filepath.name == "orientation_2.md":
                 content = self._update_orientation2_html(content)
 
             if content != original_content:
@@ -2042,6 +2047,8 @@ class RepositoryUpdater:
 								Sim Racing League website</a>.
 						</p>'''
             content = self.replace_placeholder(content, "SIM_RACING_PARAGRAPH", sim_paragraph)
+        else:
+            content = self.replace_placeholder(content, "SIM_RACING_PARAGRAPH", "")
 
         # Update organizers grid
         organizers_html = self._generate_organizers_html()
@@ -2070,7 +2077,7 @@ class RepositoryUpdater:
             o1_zoom = self.o1.get("zoom_link", "")
             o1_slides = self.o1.get("slides_link", "")
             o1_video = self.o1.get("video_link", "")
-            o1_row = f'''<tr>
+            o1_row = self._clean_html(f'''<tr>
 							<td class="tg-1vzr"><span
 									style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">{o1_date}, {o1_time}</span>
 							</td>
@@ -2085,7 +2092,7 @@ class RepositoryUpdater:
 									<a
 										href="{o1_video}">Video</a></span>
 							</td>
-						</tr>'''
+						</tr>''')
             content = self.replace_placeholder(content, "TL_O1_ROW", o1_row)
 
             # Registration Closes
@@ -2099,7 +2106,7 @@ class RepositoryUpdater:
             o2_zoom = self.o2.get("zoom_link", "")
             o2_slides = self.o2.get("slides_link", "")
             o2_video = self.o2.get("video_link", "")
-            o2_row = f'''<tr>
+            o2_row = self._clean_html(f'''<tr>
 							<td class="tg-tbri"><span
 									style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">{o2_date}, {o2_time}</span></td>
 							<td class="tg-npj4"><a
@@ -2113,7 +2120,7 @@ class RepositoryUpdater:
 									<a
 										href="{o2_video}">Video</a></span>
 							</td>
-						</tr>'''
+						</tr>''')
             content = self.replace_placeholder(content, "TL_O2_ROW", o2_row)
 
             # Track Setup
@@ -2138,9 +2145,9 @@ class RepositoryUpdater:
 
         # Sim Racing timeline paragraph - full element
         sim_timeline_url = self.sim.get("timeline_url", "")
-        sim_paragraph = f'''<p>For a detailed timeline of the virtual competition, please refer to the <a
+        sim_paragraph = self._clean_html(f'''<p>For a detailed timeline of the virtual competition, please refer to the <a
 					href="{sim_timeline_url}">virtual
-					competition website</a>. </p>'''
+					competition website</a>. </p>''')
         content = self.replace_placeholder(content, "TL_SIM_PARAGRAPH", sim_paragraph)
 
         return content
@@ -2155,7 +2162,7 @@ class RepositoryUpdater:
         # Registration info paragraph - full element
         sim_edition = self.sim.get("edition", "3rd")
         sim_reg_url = self.sim.get("registration_url", "")
-        reg_info = f'''<p>This competition is open for everyone of all levels, everyone is welcome to participate in this
+        reg_info = self._clean_html(f'''<p>This competition is open for everyone of all levels, everyone is welcome to participate in this
 					competition.
 					A team can consist of multiple teammates. Teams with only one person are also allowed.
 					Teams that take part in the in-person competition need to provide and build an Roboracer car by
@@ -2166,7 +2173,7 @@ class RepositoryUpdater:
 					<br>
 					The following Google form is only for preliminary registration and for orientation and information
 					sessions. Registration to {self.conf_with_year} is expected for all competitors.
-				</p>'''
+				</p>''')
         content = self.replace_placeholder(content, "REG_INFO_PARAGRAPH", reg_info)
 
         # Update registration button based on status
@@ -2179,7 +2186,7 @@ class RepositoryUpdater:
         # Handle hide participants section
         if hide_participants:
             # Replace participants section with hidden version
-            hidden_section = '''
+            hidden_section = self._clean_html('''
 				<hr style="display:none;">
 				<h3 id="participants" style="display:none;">Participants</h3>
 				<p style="display:none;">
@@ -2199,11 +2206,11 @@ class RepositoryUpdater:
 					<tbody>
 					</tbody>
 				</table>
-				'''
+				''')
             content = self.replace_placeholder(content, "PARTICIPANTS_SECTION", hidden_section)
         else:
             # Show participants section
-            visible_section = '''
+            visible_section = self._clean_html('''
 				<hr>
 				<h3 id="participants">Participants</h3>
 				<p>
@@ -2223,7 +2230,7 @@ class RepositoryUpdater:
 					<tbody>
 					</tbody>
 				</table>
-				'''
+				''')
             content = self.replace_placeholder(content, "PARTICIPANTS_SECTION", visible_section)
 
         return content
@@ -2259,9 +2266,9 @@ class RepositoryUpdater:
         # Update time trial section - hide if no link
         tt_link = self.results.get("time_trial_sheet_link", "")
         if tt_link:
-            tt_section = f'''<br>
+            tt_section = self._clean_html(f'''<br>
 						<h3 style="text-align: left;">TIME TRIAL</h3>
-						<a href="{tt_link}" class="button">Mapping Schedule, Qualification</a>'''
+						<a href="{tt_link}" class="button">Mapping Schedule, Qualification</a>''')
         else:
             tt_section = ''  # Hide entire section
         content = self.replace_placeholder(content, "TIME_TRIAL_SECTION", tt_section)
@@ -2269,10 +2276,10 @@ class RepositoryUpdater:
         # Update bracket section - hide if no link
         bracket_link = self.results.get("bracket_link", "")
         if bracket_link:
-            bracket_section = f'''<br>
+            bracket_section = self._clean_html(f'''<br>
 						<br>
 						<h3 style="text-align: left;">HEAD TO HEAD RACE BRACKET</h3>
-						<a href="{bracket_link}" class="button">TOURNAMENT</a>'''
+						<a href="{bracket_link}" class="button">TOURNAMENT</a>''')
         else:
             bracket_section = ''  # Hide entire section
         content = self.replace_placeholder(content, "BRACKET_SECTION", bracket_section)
@@ -2285,12 +2292,12 @@ class RepositoryUpdater:
         video_link = self.o1.get("video_link", "")
 
         # Generate full content block
-        o1_content = f'''<h3> Orientation 1 Slides </h3>
+        o1_content = self._clean_html(f'''<h3> Orientation 1 Slides </h3>
 						<iframe src="{slides_link}" frameborder="0" width="960" height="569" allowfullscreen="true" mozallowfullscreen="true"
 							webkitallowfullscreen="true"></iframe>
 
 						<h3> Orientation 1 Video Recording</h3>
-						<iframe src="{video_link}" width="640" height="480" allow="autoplay"></iframe>'''
+						<iframe src="{video_link}" width="640" height="480" allow="autoplay"></iframe>''')
         content = self.replace_placeholder(content, "O1_CONTENT", o1_content)
 
         return content
