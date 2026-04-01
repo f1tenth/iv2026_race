@@ -80,6 +80,14 @@
             "institution": "Clemson University"
         },
         {
+            "name": "Amr El-Wakeel",
+            "profile_url": "",
+            "title": "Assistant Professor, Director, Intelligent Cyber-Physical Systems Lab",
+            "department": "Lane Department of Computer Science & Electrical Engineering",
+            "institution": "West Virginia University",
+            "image": "images/organizer/amr_el-wakeel.png"
+        },
+        {
             "name": "Ahmad Amine",
             "image": "images/organizer/Ahmad.jpg",
             "profile_url": "https://ahmadamine998.github.io/",
