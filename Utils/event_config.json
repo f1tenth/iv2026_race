@@ -102,6 +102,14 @@
             "title": "Ph.D. Candidate",
             "department": "Department of Automotive Engineering",
             "institution": "Clemson University - ICAR"
+        },
+        {
+            "name": "Mohamed Elgouhary",
+            "profile_url": "https://mohamed-elgouhary.github.io/",
+            "title": "PH.D. CANDIDATE",
+            "department": "Lane Department of Computer Science and Electrical Engineering",
+            "institution": "West Virginia University",
+            "image": "images/organizer/Mohamed Elgouhary.jpeg"
         }
     ]
 }
