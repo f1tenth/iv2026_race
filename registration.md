@@ -32,9 +32,8 @@ Registration of accommodation needs to be organized and paid for individually by
 <!-- PARTICIPANTS_SECTION --><hr style="display:none;">
 <h3 id="participants" style="display:none;">Participants</h3>
 <p style="display:none;">
-If you have registered for participation but the list below is not updated, please contact us at
-<a href="mailto:contact@roboracer.ai"><span
-class="label">contact@roboracer.ai</span></a>. <br>
+If you have registered for participation but the list below is not updated, please contact us at <a href="mailto:contact@roboracer.ai"><span class="label">contact@roboracer.ai</span></a>.
+<br>
 Register the modified information under the same team name, and we will update it accordingly.
 </p>
 <table style="display:none;">
