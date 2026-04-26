@@ -96,23 +96,17 @@ section: timeline
 	<tbody>
 		<tr class="tg-1vzr">
 			<td class="tg-1vzr"><span style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent"><!-- TL_REG_OPEN_DATE -->March 3rd<!-- /TL_REG_OPEN_DATE --></span></td>
-			<td class="tg-j1gp"><span style="font-weight:400;font-style:normal"> <a>Registration Opens</a></span></td>
+			<td class="tg-j1gp"><span style="font-weight:400;font-style:normal"><!-- TL_REG_OPEN_TEXT --><a href="https://forms.gle/Dgcv3Ta1Aq354GtA7">Registration Opens</a><!-- /TL_REG_OPEN_TEXT --></span></td>
 		</tr>
 
 		<!-- TL_O1_ROW --><tr>
 <td class="tg-1vzr"><span
-style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">April 19th, 11:00AM - 12:00PM ET</span>
+style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent"><span style="text-decoration:line-through;color:#c00;">April 19th, 11:00AM - 12:00PM ET</span><br><span>April 30th, 11:00AM - 12:00PM ET</span></span>
 </td>
-<td class="tg-j1gp"><a
-href=""><span
-style="font-weight:inherit;font-style:inherit">Roboracer Orientation 1 (
-Competition Rules overview )</span></a><br>
+<td class="tg-j1gp"><span style="font-weight:inherit;font-style:inherit">Roboracer Orientation 1 ( Competition Rules overview )</span><br>
 <span
 style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">
-<a
-href="">Slide</a>
-<a
-href="">Video</a></span>
+Slide Video</span>
 </td>
 </tr><!-- /TL_O1_ROW -->
 
@@ -120,23 +114,17 @@ href="">Video</a></span>
 			<td class="tg-tbri"><span
 					style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent"><!-- TL_REG_CLOSE_DATE -->May 15th<!-- /TL_REG_CLOSE_DATE --></span></td>
 			<td class="tg-npj4"><span style="font-weight:400;font-style:normal">Registration Closes,
-					Video Demonstration Due</span>
+					<!-- TL_VIDEO_DEMO_TEXT --><a href="https://forms.gle/TC169HeL37DqiLf16">Video Demonstration Due</a><!-- /TL_VIDEO_DEMO_TEXT --></span>
 			</td>
 		</tr>
 
 		<!-- TL_O2_ROW --><tr>
 <td class="tg-tbri"><span
 style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">May 17th, 11:00AM - 12:00PM ET</span></td>
-<td class="tg-npj4"><a
-href=""><span
-style="font-weight:400;font-style:normal">Roboracer Orientation 2 ( Track set
-up, Track overview for in-person competition, Teams Training )</span></a><br>
+<td class="tg-npj4"><span style="font-weight:400;font-style:normal">Roboracer Orientation 2 ( Track set up, Track overview for in-person competition, Teams Training )</span><br>
 <span
 style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">
-<a
-href="">Slide</a>
-<a
-href="">Video</a></span>
+Slide Video</span>
 </td>
 </tr><!-- /TL_O2_ROW -->
 
@@ -173,15 +161,6 @@ href="">Video</a></span>
 			<td class="tg-j1gp"><span
 					style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">
 					Head-to-Head Tournament & Award Ceremony</span>
-			</td>
-		</tr>
-
-		<tr>
-			<td class="tg-1vzr"><span
-					style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent"><!-- TL_WS_DATE -->June 5th, until 4:00 PM CEST (t.b.c.)<!-- /TL_WS_DATE --></span></td>
-			<td class="tg-j1gp"><span
-					style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">
-					Workshop and team presentations</span>
 			</td>
 		</tr>
 	</tbody>
@@ -275,7 +254,5 @@ href="">Video</a></span>
 
 </center>
 
-<!-- TL_SIM_PARAGRAPH --><p>For a detailed timeline of the virtual competition, please refer to the <a
-href="https://autodrive-ecosystem.github.io/competitions/roboracer-sim-racing-iv-2026/#timeline">virtual
-competition website</a>. </p><!-- /TL_SIM_PARAGRAPH -->
+<!-- TL_SIM_PARAGRAPH --><!-- /TL_SIM_PARAGRAPH -->
 
