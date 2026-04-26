@@ -79,12 +79,14 @@ def get_default_config() -> dict:
         },
         "orientation_1": {
             "time_display": "11:00AM - 12:00PM ET",
+            "date_override": "",
             "zoom_link": "",
             "slides_link": "",
             "video_link": "",
         },
         "orientation_2": {
             "time_display": "11:00AM - 12:00PM ET",
+            "date_override": "",
             "zoom_link": "",
             "slides_link": "",
             "video_link": "",
@@ -92,6 +94,7 @@ def get_default_config() -> dict:
         "registration": {
             "status": "closed",
             "form_link": "",
+            "video_demo_form_link": "",
             "hide_participants": False,
         },
         "results": {
@@ -842,7 +845,7 @@ class EventManagerApp:
         row = 0
         ttk.Label(
             frame,
-            text="Dates are calculated from the Dates & Timeline tab. Only enter the time.",
+            text="Dates are calculated from the Dates & Timeline tab. Use Date Override to change (shows original strikethrough).",
             foreground="#a6adc8",
         ).grid(row=row, column=0, columnspan=2, sticky=tk.W, padx=5, pady=5)
 
@@ -861,6 +864,10 @@ class EventManagerApp:
         self.o1_date_label = ttk.Label(frame, text="(click 'Calculate Dates' in Dates tab)", foreground="#00bcd4")
         self.o1_date_label.grid(row=row, column=1, sticky=tk.W, padx=5, pady=5)
 
+        row += 1
+        self.o1_date_override_entry = self.create_labeled_entry(
+            frame, "Date Override (e.g., May 10th):", row, o1.get("date_override", "")
+        )
         row += 1
         self.o1_time_entry = self.create_labeled_entry(
             frame, "Time (e.g., 11:00AM - 12:00PM ET):", row, o1.get("time_display", "")
@@ -897,6 +904,10 @@ class EventManagerApp:
         self.o2_date_label = ttk.Label(frame, text="(click 'Calculate Dates' in Dates tab)", foreground="#00bcd4")
         self.o2_date_label.grid(row=row, column=1, sticky=tk.W, padx=5, pady=5)
 
+        row += 1
+        self.o2_date_override_entry = self.create_labeled_entry(
+            frame, "Date Override (e.g., May 10th):", row, o2.get("date_override", "")
+        )
         row += 1
         self.o2_time_entry = self.create_labeled_entry(
             frame, "Time (e.g., 11:00AM - 12:00PM ET):", row, o2.get("time_display", "")
@@ -943,6 +954,10 @@ class EventManagerApp:
         row += 1
         self.reg_form_entry = self.create_labeled_entry(
             frame, "Registration Form Link:", row, reg.get("form_link", "")
+        )
+        row += 1
+        self.video_demo_form_entry = self.create_labeled_entry(
+            frame, "Video Demo Submission Form:", row, reg.get("video_demo_form_link", "")
         )
 
         # Participants section
@@ -1746,12 +1761,14 @@ class EventManagerApp:
             },
             "orientation_1": {
                 "time_display": self.o1_time_entry.get().strip(),
+                "date_override": self.o1_date_override_entry.get().strip(),
                 "zoom_link": self.o1_zoom_entry.get().strip(),
                 "slides_link": self.o1_slides_entry.get().strip(),
                 "video_link": self.o1_video_entry.get().strip(),
             },
             "orientation_2": {
                 "time_display": self.o2_time_entry.get().strip(),
+                "date_override": self.o2_date_override_entry.get().strip(),
                 "zoom_link": self.o2_zoom_entry.get().strip(),
                 "slides_link": self.o2_slides_entry.get().strip(),
                 "video_link": self.o2_video_entry.get().strip(),
@@ -1759,6 +1776,7 @@ class EventManagerApp:
             "registration": {
                 "status": self.reg_status_var.get(),
                 "form_link": self.reg_form_entry.get().strip(),
+                "video_demo_form_link": self.video_demo_form_entry.get().strip(),
                 "hide_participants": self.hide_participants_var.get(),
             },
             "results": {
@@ -2066,59 +2084,115 @@ class RepositoryUpdater:
 
         # Update date cells with calculated dates
         if self.dates:
-            # Registration Opens
+            # Registration Opens - link to registration form if available
             if "registration_open" in self.dates:
                 reg_open = format_date_display(self.dates["registration_open"])
                 content = self.replace_placeholder(content, "TL_REG_OPEN_DATE", reg_open)
 
+            # Registration Opens row - make it a link if form_link is available
+            reg_form_link = self.reg.get("form_link", "")
+            if reg_form_link:
+                reg_open_text = f'<a href="{reg_form_link}">Registration Opens</a>'
+            else:
+                reg_open_text = 'Registration Opens'
+            content = self.replace_placeholder(content, "TL_REG_OPEN_TEXT", reg_open_text)
+
             # Orientation 1 row - full element
-            o1_date = format_date_display(self.dates.get("orientation_1", "")) if "orientation_1" in self.dates else ""
+            o1_calc_date = format_date_display(self.dates.get("orientation_1", "")) if "orientation_1" in self.dates else ""
+            o1_date_override = self.o1.get("date_override", "")
             o1_time = self.o1.get("time_display", "")
             o1_zoom = self.o1.get("zoom_link", "")
             o1_slides = self.o1.get("slides_link", "")
             o1_video = self.o1.get("video_link", "")
+
+            # Build date display - show strikethrough if overridden
+            if o1_date_override:
+                o1_date_html = f'<span style="text-decoration:line-through;color:#c00;">{o1_calc_date}, {o1_time}</span><br><span>{o1_date_override}, {o1_time}</span>'
+            else:
+                o1_date_html = f'{o1_calc_date}, {o1_time}'
+
+            # Build orientation title - only link if zoom_link is provided
+            if o1_zoom:
+                o1_title = f'<a href="{o1_zoom}"><span style="font-weight:inherit;font-style:inherit">Roboracer Orientation 1 ( Competition Rules overview )</span></a>'
+            else:
+                o1_title = '<span style="font-weight:inherit;font-style:inherit">Roboracer Orientation 1 ( Competition Rules overview )</span>'
+
+            # Build slide/video links - only show as links if URLs are provided
+            o1_resources = []
+            if o1_slides:
+                o1_resources.append(f'<a href="{o1_slides}">Slide</a>')
+            else:
+                o1_resources.append('Slide')
+            if o1_video:
+                o1_resources.append(f'<a href="{o1_video}">Video</a>')
+            else:
+                o1_resources.append('Video')
+            o1_resources_html = ' '.join(o1_resources)
+
             o1_row = self._clean_html(f'''<tr>
 							<td class="tg-1vzr"><span
-									style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">{o1_date}, {o1_time}</span>
+									style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">{o1_date_html}</span>
 							</td>
-							<td class="tg-j1gp"><a
-									href="{o1_zoom}"><span
-										style="font-weight:inherit;font-style:inherit">Roboracer Orientation 1 (
-										Competition Rules overview )</span></a><br>
+							<td class="tg-j1gp">{o1_title}<br>
 								<span
 									style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">
-									<a
-										href="{o1_slides}">Slide</a>
-									<a
-										href="{o1_video}">Video</a></span>
+									{o1_resources_html}</span>
 							</td>
 						</tr>''')
             content = self.replace_placeholder(content, "TL_O1_ROW", o1_row)
 
-            # Registration Closes
+            # Registration Closes and Video Demo row
             if "registration_closes" in self.dates:
                 reg_close = format_date_display(self.dates["registration_closes"])
                 content = self.replace_placeholder(content, "TL_REG_CLOSE_DATE", reg_close)
 
+            # Video Demo form link - make it a link if provided
+            video_demo_form = self.reg.get("video_demo_form_link", "")
+            if video_demo_form:
+                video_demo_text = f'<a href="{video_demo_form}">Video Demonstration Due</a>'
+            else:
+                video_demo_text = 'Video Demonstration Due'
+            content = self.replace_placeholder(content, "TL_VIDEO_DEMO_TEXT", video_demo_text)
+
             # Orientation 2 row - full element
-            o2_date = format_date_display(self.dates.get("orientation_2", "")) if "orientation_2" in self.dates else ""
+            o2_calc_date = format_date_display(self.dates.get("orientation_2", "")) if "orientation_2" in self.dates else ""
+            o2_date_override = self.o2.get("date_override", "")
             o2_time = self.o2.get("time_display", "")
             o2_zoom = self.o2.get("zoom_link", "")
             o2_slides = self.o2.get("slides_link", "")
             o2_video = self.o2.get("video_link", "")
+
+            # Build date display - show strikethrough if overridden
+            if o2_date_override:
+                o2_date_html = f'<span style="text-decoration:line-through;color:#c00;">{o2_calc_date}, {o2_time}</span><br><span>{o2_date_override}, {o2_time}</span>'
+            else:
+                o2_date_html = f'{o2_calc_date}, {o2_time}'
+
+            # Build orientation title - only link if zoom_link is provided
+            if o2_zoom:
+                o2_title = f'<a href="{o2_zoom}"><span style="font-weight:400;font-style:normal">Roboracer Orientation 2 ( Track set up, Track overview for in-person competition, Teams Training )</span></a>'
+            else:
+                o2_title = '<span style="font-weight:400;font-style:normal">Roboracer Orientation 2 ( Track set up, Track overview for in-person competition, Teams Training )</span>'
+
+            # Build slide/video links - only show as links if URLs are provided
+            o2_resources = []
+            if o2_slides:
+                o2_resources.append(f'<a href="{o2_slides}">Slide</a>')
+            else:
+                o2_resources.append('Slide')
+            if o2_video:
+                o2_resources.append(f'<a href="{o2_video}">Video</a>')
+            else:
+                o2_resources.append('Video')
+            o2_resources_html = ' '.join(o2_resources)
+
             o2_row = self._clean_html(f'''<tr>
 							<td class="tg-tbri"><span
-									style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">{o2_date}, {o2_time}</span></td>
-							<td class="tg-npj4"><a
-									href="{o2_zoom}"><span
-										style="font-weight:400;font-style:normal">Roboracer Orientation 2 ( Track set
-										up, Track overview for in-person competition, Teams Training )</span></a><br>
+									style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">{o2_date_html}</span></td>
+							<td class="tg-npj4">{o2_title}<br>
 								<span
 									style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">
-									<a
-										href="{o2_slides}">Slide</a>
-									<a
-										href="{o2_video}">Video</a></span>
+									{o2_resources_html}</span>
 							</td>
 						</tr>''')
             content = self.replace_placeholder(content, "TL_O2_ROW", o2_row)
@@ -2143,11 +2217,14 @@ class RepositoryUpdater:
                 race = format_date_display(self.dates["race"])
                 content = self.replace_placeholder(content, "TL_RACE_DATE", race)
 
-        # Sim Racing timeline paragraph - full element
-        sim_timeline_url = self.sim.get("timeline_url", "")
-        sim_paragraph = self._clean_html(f'''<p>For a detailed timeline of the virtual competition, please refer to the <a
+        # Sim Racing timeline paragraph - only show if sim racing is enabled
+        if self.sim.get("enabled", False):
+            sim_timeline_url = self.sim.get("timeline_url", "")
+            sim_paragraph = self._clean_html(f'''<p>For a detailed timeline of the virtual competition, please refer to the <a
 					href="{sim_timeline_url}">virtual
 					competition website</a>. </p>''')
+        else:
+            sim_paragraph = ""
         content = self.replace_placeholder(content, "TL_SIM_PARAGRAPH", sim_paragraph)
 
         return content

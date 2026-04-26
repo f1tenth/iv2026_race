@@ -27,12 +27,14 @@
     },
     "orientation_1": {
         "time_display": "11:00AM - 12:00PM ET",
+        "date_override": "April 30th",
         "zoom_link": "",
         "slides_link": "",
         "video_link": ""
     },
     "orientation_2": {
         "time_display": "11:00AM - 12:00PM ET",
+        "date_override": "",
         "zoom_link": "",
         "slides_link": "",
         "video_link": ""
@@ -40,6 +42,7 @@
     "registration": {
         "status": "open",
         "form_link": "https://forms.gle/Dgcv3Ta1Aq354GtA7",
+        "video_demo_form_link": "https://forms.gle/TC169HeL37DqiLf16",
         "hide_participants": true
     },
     "results": {
@@ -57,10 +60,10 @@
     },
     "sim_racing": {
         "enabled": false,
-        "edition": "6th",
-        "website_url": "https://autodrive-ecosystem.github.io/competitions/roboracer-sim-racing-iv-2026/",
-        "registration_url": "https://autodrive-ecosystem.github.io/competitions/roboracer-sim-racing-iv-2026/#registration",
-        "timeline_url": "https://autodrive-ecosystem.github.io/competitions/roboracer-sim-racing-iv-2026/#timeline"
+        "edition": "",
+        "website_url": "",
+        "registration_url": "",
+        "timeline_url": ""
     },
     "organizers": [
         {
