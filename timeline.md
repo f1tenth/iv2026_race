@@ -103,7 +103,7 @@ section: timeline
 <td class="tg-1vzr"><span
 style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent"><span style="text-decoration:line-through;color:#c00;">April 19th, 11:00AM - 12:00PM ET</span><br><span>April 30th, 11:00AM - 12:00PM ET</span></span>
 </td>
-<td class="tg-j1gp"><span style="font-weight:inherit;font-style:inherit">Roboracer Orientation 1 ( Competition Rules overview )</span><br>
+<td class="tg-j1gp"><a href="https://upenn.zoom.us/j/97388124417?pwd=sPaeiF2MRbPRpMSaIgVPHlbaGutCVW.1"><span style="font-weight:inherit;font-style:inherit">Roboracer Orientation 1 ( Competition Rules overview )</span></a><br>
 <span
 style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">
 Slide Video</span>
@@ -121,7 +121,7 @@ Slide Video</span>
 		<!-- TL_O2_ROW --><tr>
 <td class="tg-tbri"><span
 style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">May 17th, 11:00AM - 12:00PM ET</span></td>
-<td class="tg-npj4"><span style="font-weight:400;font-style:normal">Roboracer Orientation 2 ( Track set up, Track overview for in-person competition, Teams Training )</span><br>
+<td class="tg-npj4"><a href="https://upenn.zoom.us/j/97791543385?pwd=3Gcoe5PQdNbNCYA5xR738njk9j6buZ.1"><span style="font-weight:400;font-style:normal">Roboracer Orientation 2 ( Track set up, Track overview for in-person competition, Teams Training )</span></a><br>
 <span
 style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">
 Slide Video</span>
