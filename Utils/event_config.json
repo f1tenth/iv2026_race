@@ -65,6 +65,28 @@
         "registration_url": "",
         "timeline_url": ""
     },
+    "competition_days": {
+        "track_setup": {
+            "enabled": true,
+            "date_override": "June 22nd",
+            "time_display": ""
+        },
+        "team_training": {
+            "enabled": false,
+            "date_override": "",
+            "time_display": ""
+        },
+        "qualification": {
+            "enabled": true,
+            "date_override": "",
+            "time_display": "9:00AM - 12:00 PM ET"
+        },
+        "race": {
+            "enabled": true,
+            "date_override": "June 23rd",
+            "time_display": "12:00PM - 6:00 PM ET"
+        }
+    },
     "organizers": [
         {
             "name": "Rahul Mangharam",

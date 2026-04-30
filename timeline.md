@@ -128,41 +128,25 @@ Slide Video</span>
 </td>
 </tr><!-- /TL_O2_ROW -->
 
-		<tr>
-			<td class="tg-1vzr"><span
-					style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent"><!-- TL_TRACK_SETUP_DATE -->June 21st<!-- /TL_TRACK_SETUP_DATE --></span></td>
-			<td class="tg-j1gp"><span
-					style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">
-					Teams on-site registration and training/practice sessions</span>
-			</td>
-		</tr>
+		<!-- TL_TRACK_SETUP_ROW --><tr>
+<td class="tg-1vzr"><span style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">June 22nd</span></td>
+<td class="tg-j1gp"><span style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">Teams on-site registration and training/practice sessions</span>
+</td>
+</tr><!-- /TL_TRACK_SETUP_ROW -->
 
-		<tr>
-			<td class="tg-1vzr"><span
-					style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent"><!-- TL_TRAINING_DATE -->June 22nd<!-- /TL_TRAINING_DATE --></span></td>
-			<td class="tg-j1gp"><span
-					style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">
-					Training/practice sessions</span>
-			</td>
-		</tr>
+		<!-- TL_TRAINING_ROW --><!-- /TL_TRAINING_ROW -->
 
-		<tr>
-			<td class="tg-1vzr"><span
-					style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent"><!-- TL_QUAL_DATE -->June 23rd<!-- /TL_QUAL_DATE --></span></td>
-			<td class="tg-j1gp"><span
-					style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">
-					Qualification Time Trials</span>
-			</td>
-		</tr>
+		<!-- TL_QUAL_ROW --><tr>
+<td class="tg-1vzr"><span style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">June 23rd, 9:00AM - 12:00 PM ET</span></td>
+<td class="tg-j1gp"><span style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">Qualification Time Trials</span>
+</td>
+</tr><!-- /TL_QUAL_ROW -->
 
-		<tr>
-			<td class="tg-1vzr"><span
-					style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent"><!-- TL_RACE_DATE -->June 24th<!-- /TL_RACE_DATE --></span></td>
-			<td class="tg-j1gp"><span
-					style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">
-					Head-to-Head Tournament & Award Ceremony</span>
-			</td>
-		</tr>
+		<!-- TL_RACE_ROW --><tr>
+<td class="tg-1vzr"><span style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">June 23rd, 12:00PM - 6:00 PM ET</span></td>
+<td class="tg-j1gp"><span style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">Head-to-Head Tournament &amp; Award Ceremony</span>
+</td>
+</tr><!-- /TL_RACE_ROW -->
 	</tbody>
 </table>
 
