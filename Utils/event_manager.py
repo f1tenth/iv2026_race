@@ -77,6 +77,12 @@ def get_default_config() -> dict:
                 "registration_open": -113,
             },
         },
+        "competition_days": {
+            "track_setup": {"enabled": True, "date_override": "", "time_display": ""},
+            "team_training": {"enabled": True, "date_override": "", "time_display": ""},
+            "qualification": {"enabled": True, "date_override": "", "time_display": ""},
+            "race": {"enabled": True, "date_override": "", "time_display": ""},
+        },
         "orientation_1": {
             "time_display": "11:00AM - 12:00PM ET",
             "date_override": "",
@@ -494,6 +500,7 @@ class EventManagerApp:
         # Create tabs
         self.create_event_tab()
         self.create_dates_tab()
+        self.create_competition_days_tab()
         self.create_orientations_tab()
         self.create_registration_tab()
         self.create_results_tab()
@@ -833,6 +840,235 @@ class EventManagerApp:
         self.dates_preview.grid(
             row=row, column=0, columnspan=2, sticky=tk.EW, padx=5, pady=5
         )
+
+    def create_competition_days_tab(self) -> None:
+        """Create the Competition Days tab with per-day toggle, date override, and time."""
+        outer_frame = ttk.Frame(self.notebook, padding=0)
+        self.notebook.add(outer_frame, text="Competition Days")
+
+        canvas = tk.Canvas(outer_frame, bg="#1e1e2e", highlightthickness=0)
+        scrollbar = ttk.Scrollbar(outer_frame, orient="vertical", command=canvas.yview)
+        frame = ttk.Frame(canvas, padding=10)
+
+        frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        canvas.create_window((0, 0), window=frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
+        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+
+        frame.columnconfigure(1, weight=1)
+
+        comp_days_config = self.config.get("competition_days", {})
+
+        row = 0
+        ttk.Label(
+            frame,
+            text="Configure each on-site competition day. Disable a day to hide it from the timeline.\nTip: set Qualification and Race to the same date to merge them into one day.",
+            foreground="#a6adc8",
+        ).grid(row=row, column=0, columnspan=3, sticky=tk.W, padx=5, pady=5)
+
+        self.comp_days_enabled: dict[str, tk.BooleanVar] = {}
+        self.comp_days_date_override: dict[str, tk.Entry] = {}
+        self.comp_days_time: dict[str, tk.Entry] = {}
+        self.comp_days_date_labels: dict[str, ttk.Label] = {}
+
+        day_defs = [
+            ("track_setup", "Day 1: On-site Registration & Training"),
+            ("team_training", "Day 2: Training / Practice Sessions"),
+            ("qualification", "Day 3: Qualification Time Trials"),
+            ("race", "Day 4: Head-to-Head Tournament"),
+        ]
+
+        for day_key, day_title in day_defs:
+            day_cfg = comp_days_config.get(day_key, {})
+
+            row += 1
+            ttk.Separator(frame, orient=tk.HORIZONTAL).grid(
+                row=row, column=0, columnspan=3, sticky=tk.EW, pady=10
+            )
+
+            row += 1
+            header_frame = ttk.Frame(frame)
+            header_frame.grid(row=row, column=0, columnspan=3, sticky=tk.W, padx=5, pady=2)
+
+            ttk.Label(header_frame, text=day_title, font=("Ubuntu", 11, "bold")).pack(
+                side=tk.LEFT, padx=(0, 15)
+            )
+            enabled_var = tk.BooleanVar(value=day_cfg.get("enabled", True))
+            self.comp_days_enabled[day_key] = enabled_var
+            ttk.Checkbutton(header_frame, text="Enabled", variable=enabled_var).pack(side=tk.LEFT)
+
+            row += 1
+            ttk.Label(frame, text="Calculated Date:").grid(
+                row=row, column=0, sticky=tk.W, padx=5, pady=3
+            )
+            date_label = ttk.Label(
+                frame, text="(calculate in Dates tab)", foreground="#00bcd4"
+            )
+            date_label.grid(row=row, column=1, sticky=tk.W, padx=5, pady=3)
+            self.comp_days_date_labels[day_key] = date_label
+
+            row += 1
+            ttk.Label(frame, text="Date Override (e.g., June 21st):").grid(
+                row=row, column=0, sticky=tk.W, padx=5, pady=3
+            )
+            date_frame = ttk.Frame(frame)
+            date_frame.grid(row=row, column=1, sticky=tk.W, padx=5, pady=3)
+
+            date_entry = tk.Entry(
+                date_frame,
+                width=20,
+                bg="#2a2a3c",
+                fg="#cdd6f4",
+                insertbackground="#cdd6f4",
+                relief=tk.FLAT,
+                font=("Ubuntu", 10),
+                highlightthickness=1,
+                highlightcolor="#89b4fa",
+                highlightbackground="#45475a",
+            )
+            date_entry.pack(side=tk.LEFT, padx=(0, 5), ipady=5)
+            date_entry.insert(0, day_cfg.get("date_override", ""))
+            self.comp_days_date_override[day_key] = date_entry
+
+            ttk.Button(
+                date_frame,
+                text="Pick Date...",
+                command=lambda e=date_entry: self.open_date_picker_for_entry(e),
+            ).pack(side=tk.LEFT)
+
+            row += 1
+            ttk.Label(frame, text="Time (e.g., 9:00AM - 6:00PM ET):").grid(
+                row=row, column=0, sticky=tk.W, padx=5, pady=3
+            )
+            time_entry = tk.Entry(
+                frame,
+                width=30,
+                bg="#2a2a3c",
+                fg="#cdd6f4",
+                insertbackground="#cdd6f4",
+                relief=tk.FLAT,
+                font=("Ubuntu", 10),
+                highlightthickness=1,
+                highlightcolor="#89b4fa",
+                highlightbackground="#45475a",
+            )
+            time_entry.grid(row=row, column=1, sticky=tk.W, padx=5, pady=3, ipady=3)
+            time_entry.insert(0, day_cfg.get("time_display", ""))
+            self.comp_days_time[day_key] = time_entry
+
+        self.update_competition_day_labels()
+
+    def open_date_picker_for_entry(self, entry_widget: tk.Entry) -> None:
+        """Open a calendar dialog and set a formatted display date in an entry widget."""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Select Date")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        dialog.configure(bg="#1e1e2e")
+
+        current_date = datetime.now()
+
+        cal = Calendar(
+            dialog,
+            selectmode="day",
+            year=current_date.year,
+            month=current_date.month,
+            day=current_date.day,
+            date_pattern="yyyy-mm-dd",
+            background="#1e1e2e",
+            foreground="#cdd6f4",
+            headersbackground="#2a2a3c",
+            headersforeground="#89b4fa",
+            selectbackground="#89b4fa",
+            selectforeground="#1e1e2e",
+            normalbackground="#2a2a3c",
+            normalforeground="#cdd6f4",
+            weekendbackground="#2a2a3c",
+            weekendforeground="#f5c2e7",
+            othermonthbackground="#1e1e2e",
+            othermonthforeground="#45475a",
+            othermonthwebackground="#1e1e2e",
+            othermonthweforeground="#45475a",
+            bordercolor="#45475a",
+            font=("Ubuntu", 11),
+        )
+        cal.pack(padx=15, pady=15)
+
+        def on_select():
+            date = datetime.strptime(cal.get_date(), "%Y-%m-%d")
+            entry_widget.delete(0, tk.END)
+            entry_widget.insert(0, format_date_display(date))
+            dialog.destroy()
+
+        btn_frame = tk.Frame(dialog, bg="#1e1e2e")
+        btn_frame.pack(pady=15)
+
+        tk.Button(
+            btn_frame,
+            text="Select",
+            command=on_select,
+            bg="#89b4fa",
+            fg="#1e1e2e",
+            font=("Ubuntu", 10, "bold"),
+            relief=tk.FLAT,
+            padx=20,
+            pady=8,
+            cursor="hand2",
+        ).pack(side=tk.LEFT, padx=5)
+
+        tk.Button(
+            btn_frame,
+            text="Cancel",
+            command=dialog.destroy,
+            bg="#2a2a3c",
+            fg="#cdd6f4",
+            font=("Ubuntu", 10),
+            relief=tk.FLAT,
+            padx=20,
+            pady=8,
+            cursor="hand2",
+        ).pack(side=tk.LEFT, padx=5)
+
+        dialog.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (dialog.winfo_width() // 2)
+        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f"+{x}+{y}")
+
+        dialog.wait_window()
+
+    def update_competition_day_labels(self) -> None:
+        """Update the calculated-date labels on the Competition Days tab."""
+        if not hasattr(self, "comp_days_date_labels"):
+            return
+        try:
+            race_day = self.race_day_var.get().strip()
+            if not race_day:
+                return
+            offsets = {name: int(e.get().strip()) for name, e in self.offset_entries.items()}
+            dates = calculate_dates(race_day, offsets)
+            key_map = {
+                "track_setup": "track_setup",
+                "team_training": "team_training",
+                "qualification": "qualification",
+                "race": "race",
+            }
+            for day_key, dates_key in key_map.items():
+                if day_key in self.comp_days_date_labels and dates_key in dates:
+                    self.comp_days_date_labels[day_key].config(
+                        text=format_date_display(dates[dates_key])
+                    )
+        except Exception:
+            pass
 
     def create_orientations_tab(self) -> None:
         """Create the Orientations tab."""
@@ -1629,8 +1865,9 @@ class EventManagerApp:
             self.dates_preview.insert("1.0", preview_text)
             self.dates_preview.config(state=tk.DISABLED)
 
-            # Also update orientation date labels
+            # Also update orientation and competition day date labels
             self.update_orientation_dates()
+            self.update_competition_day_labels()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to calculate dates: {e}")
 
@@ -1795,6 +2032,14 @@ class EventManagerApp:
                 "website_url": self.sim_website_entry.get().strip(),
                 "registration_url": self.sim_registration_entry.get().strip(),
                 "timeline_url": self.sim_timeline_entry.get().strip(),
+            },
+            "competition_days": {
+                day: {
+                    "enabled": self.comp_days_enabled[day].get(),
+                    "date_override": self.comp_days_date_override[day].get().strip(),
+                    "time_display": self.comp_days_time[day].get().strip(),
+                }
+                for day in ["track_setup", "team_training", "qualification", "race"]
             },
             "organizers": self.organizers_data,
         }
@@ -2212,10 +2457,43 @@ class RepositoryUpdater:
                 qual = format_date_display(self.dates["qualification"])
                 content = self.replace_placeholder(content, "TL_QUAL_DATE", qual)
 
-            # Race Day
+            # Race Day (backwards-compat date-only replacement)
             if "race" in self.dates:
                 race = format_date_display(self.dates["race"])
                 content = self.replace_placeholder(content, "TL_RACE_DATE", race)
+
+        # Competition days — ROW-level replacements (toggle / date override / time)
+        comp_days = self.config.get("competition_days", {})
+        comp_day_defs = [
+            ("track_setup", "TL_TRACK_SETUP_ROW", "tg-1vzr", "tg-j1gp",
+             "Teams on-site registration and training/practice sessions"),
+            ("team_training", "TL_TRAINING_ROW", "tg-1vzr", "tg-j1gp",
+             "Training/practice sessions"),
+            ("qualification", "TL_QUAL_ROW", "tg-1vzr", "tg-j1gp",
+             "Qualification Time Trials"),
+            ("race", "TL_RACE_ROW", "tg-1vzr", "tg-j1gp",
+             "Head-to-Head Tournament &amp; Award Ceremony"),
+        ]
+        for day_key, row_ph, td1, td2, description in comp_day_defs:
+            day_cfg = comp_days.get(day_key, {"enabled": True, "date_override": "", "time_display": ""})
+            if not day_cfg.get("enabled", True):
+                content = self.replace_placeholder(content, row_ph, "")
+                continue
+            date_override = day_cfg.get("date_override", "")
+            time_display = day_cfg.get("time_display", "")
+            if date_override:
+                date_str = date_override
+            elif day_key in self.dates:
+                date_str = format_date_display(self.dates[day_key])
+            else:
+                date_str = ""
+            date_cell = f"{date_str}, {time_display}" if time_display else date_str
+            row_html = self._clean_html(f'''<tr>
+<td class="{td1}"><span style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">{date_cell}</span></td>
+<td class="{td2}"><span style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">{description}</span>
+</td>
+</tr>''')
+            content = self.replace_placeholder(content, row_ph, row_html)
 
         # Sim Racing timeline paragraph - only show if sim racing is enabled
         if self.sim.get("enabled", False):
