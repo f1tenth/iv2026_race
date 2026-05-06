@@ -106,7 +106,7 @@ style="font-weight:400;font-style:normal;text-decoration:none;color:#000;backgro
 <td class="tg-j1gp"><a href="https://upenn.zoom.us/j/97388124417?pwd=sPaeiF2MRbPRpMSaIgVPHlbaGutCVW.1"><span style="font-weight:inherit;font-style:inherit">Roboracer Orientation 1 ( Competition Rules overview )</span></a><br>
 <span
 style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">
-Slide Video</span>
+<a href="https://docs.google.com/presentation/d/1N9H2xpFFEgjpP9ARSBPqPrMTc4S81GNY9od4iv6o6eI/edit?usp=sharing">Slide</a> <a href="https://drive.google.com/file/d/1rXELCFUH_s4HoKBdEA0xe3tcBhwIOVgE/view?usp=sharing">Video</a></span>
 </td>
 </tr><!-- /TL_O1_ROW -->
 

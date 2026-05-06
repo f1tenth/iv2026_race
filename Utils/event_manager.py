@@ -2686,7 +2686,7 @@ class RepositoryUpdater:
             o2_video = self.o2.get("video_link", "")
 
             if o1_slides:
-                orientation_lines.append(f"- [Orientation 1 Meeting Slides]({o1_slides})")
+                orientation_lines.append(f"\n- [Orientation 1 Meeting Slides]({o1_slides})")
             if o1_video:
                 orientation_lines.append(f"- [Orientation 1 Recording]({o1_video})")
             if o2_slides:
