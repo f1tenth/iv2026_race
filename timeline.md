@@ -112,7 +112,7 @@ style="font-weight:400;font-style:normal;text-decoration:none;color:#000;backgro
 
 		<tr>
 			<td class="tg-tbri"><span
-					style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent"><!-- TL_REG_CLOSE_DATE -->May 15th<!-- /TL_REG_CLOSE_DATE --></span></td>
+					style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent"><!-- TL_REG_CLOSE_DATE --><span style="text-decoration:line-through;color:#c00;">May 15th</span><br><span>June 1st</span><!-- /TL_REG_CLOSE_DATE --></span></td>
 			<td class="tg-npj4"><span style="font-weight:400;font-style:normal">Registration Closes,
 					<!-- TL_VIDEO_DEMO_TEXT --><a href="https://forms.gle/TC169HeL37DqiLf16">Video Demonstration Due</a><!-- /TL_VIDEO_DEMO_TEXT --></span>
 			</td>
@@ -120,7 +120,7 @@ style="font-weight:400;font-style:normal;text-decoration:none;color:#000;backgro
 
 		<!-- TL_O2_ROW --><tr>
 <td class="tg-tbri"><span
-style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">May 17th, 11:00AM - 12:00PM ET</span></td>
+style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent"><span style="text-decoration:line-through;color:#c00;">May 17th, 11:00AM - 12:00PM ET</span><br><span>May 18th, 11:00AM - 12:00PM ET</span></span></td>
 <td class="tg-npj4"><a href="https://upenn.zoom.us/j/97791543385?pwd=3Gcoe5PQdNbNCYA5xR738njk9j6buZ.1"><span style="font-weight:400;font-style:normal">Roboracer Orientation 2 ( Track set up, Track overview for in-person competition, Teams Training )</span></a><br>
 <span
 style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">

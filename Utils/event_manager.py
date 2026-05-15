@@ -102,6 +102,8 @@ def get_default_config() -> dict:
             "form_link": "",
             "video_demo_form_link": "",
             "hide_participants": False,
+            "registration_open_date_override": "",
+            "registration_closes_date_override": "",
         },
         "results": {
             "time_trial_sheet_link": "",
@@ -1196,6 +1198,46 @@ class EventManagerApp:
             frame, "Video Demo Submission Form:", row, reg.get("video_demo_form_link", "")
         )
 
+        # Timeline date overrides
+        row += 1
+        ttk.Separator(frame, orient=tk.HORIZONTAL).grid(
+            row=row, column=0, columnspan=2, sticky=tk.EW, pady=15
+        )
+        row += 1
+        ttk.Label(frame, text="Timeline Date Overrides", font=("Ubuntu", 12, "bold")).grid(
+            row=row, column=0, columnspan=2, sticky=tk.W, padx=5, pady=10
+        )
+        row += 1
+        ttk.Label(
+            frame,
+            text="Dates are calculated from the Dates & Timeline tab. Use Date Override to change (shows original strikethrough).",
+            foreground="#a6adc8",
+        ).grid(row=row, column=0, columnspan=2, sticky=tk.W, padx=5, pady=5)
+
+        row += 1
+        ttk.Label(frame, text="Registration Opens (calculated):").grid(
+            row=row, column=0, sticky=tk.W, padx=5, pady=5
+        )
+        self.reg_open_date_label = ttk.Label(frame, text="(click 'Calculate Dates' in Dates tab)", foreground="#00bcd4")
+        self.reg_open_date_label.grid(row=row, column=1, sticky=tk.W, padx=5, pady=5)
+
+        row += 1
+        self.reg_open_date_override_entry = self.create_labeled_entry(
+            frame, "Date Override (e.g., March 10th):", row, reg.get("registration_open_date_override", "")
+        )
+
+        row += 1
+        ttk.Label(frame, text="Registration Closes (calculated):").grid(
+            row=row, column=0, sticky=tk.W, padx=5, pady=5
+        )
+        self.reg_close_date_label = ttk.Label(frame, text="(click 'Calculate Dates' in Dates tab)", foreground="#00bcd4")
+        self.reg_close_date_label.grid(row=row, column=1, sticky=tk.W, padx=5, pady=5)
+
+        row += 1
+        self.reg_close_date_override_entry = self.create_labeled_entry(
+            frame, "Date Override (e.g., May 20th):", row, reg.get("registration_closes_date_override", "")
+        )
+
         # Participants section
         row += 1
         ttk.Separator(frame, orient=tk.HORIZONTAL).grid(
@@ -1738,7 +1780,7 @@ class EventManagerApp:
                 messagebox.showerror("Error", f"Failed to clear participants: {e}")
 
     def update_orientation_dates(self) -> None:
-        """Update orientation date labels based on calculated dates."""
+        """Update orientation and registration date labels based on calculated dates."""
         try:
             race_day = self.race_day_var.get().strip()
             if not race_day:
@@ -1754,6 +1796,10 @@ class EventManagerApp:
                 self.o1_date_label.config(text=format_date_display(dates["orientation_1"]))
             if "orientation_2" in dates:
                 self.o2_date_label.config(text=format_date_display(dates["orientation_2"]))
+            if "registration_open" in dates:
+                self.reg_open_date_label.config(text=format_date_display(dates["registration_open"]))
+            if "registration_closes" in dates:
+                self.reg_close_date_label.config(text=format_date_display(dates["registration_closes"]))
         except Exception:
             pass  # Silently ignore errors during initial load
 
@@ -2015,6 +2061,8 @@ class EventManagerApp:
                 "form_link": self.reg_form_entry.get().strip(),
                 "video_demo_form_link": self.video_demo_form_entry.get().strip(),
                 "hide_participants": self.hide_participants_var.get(),
+                "registration_open_date_override": self.reg_open_date_override_entry.get().strip(),
+                "registration_closes_date_override": self.reg_close_date_override_entry.get().strip(),
             },
             "results": {
                 "time_trial_sheet_link": self.time_trial_entry.get().strip(),
@@ -2331,7 +2379,12 @@ class RepositoryUpdater:
         if self.dates:
             # Registration Opens - link to registration form if available
             if "registration_open" in self.dates:
-                reg_open = format_date_display(self.dates["registration_open"])
+                reg_open_calc = format_date_display(self.dates["registration_open"])
+                reg_open_override = self.reg.get("registration_open_date_override", "")
+                if reg_open_override:
+                    reg_open = f'<span style="text-decoration:line-through;color:#c00;">{reg_open_calc}</span><br><span>{reg_open_override}</span>'
+                else:
+                    reg_open = reg_open_calc
                 content = self.replace_placeholder(content, "TL_REG_OPEN_DATE", reg_open)
 
             # Registration Opens row - make it a link if form_link is available
@@ -2388,7 +2441,12 @@ class RepositoryUpdater:
 
             # Registration Closes and Video Demo row
             if "registration_closes" in self.dates:
-                reg_close = format_date_display(self.dates["registration_closes"])
+                reg_close_calc = format_date_display(self.dates["registration_closes"])
+                reg_close_override = self.reg.get("registration_closes_date_override", "")
+                if reg_close_override:
+                    reg_close = f'<span style="text-decoration:line-through;color:#c00;">{reg_close_calc}</span><br><span>{reg_close_override}</span>'
+                else:
+                    reg_close = reg_close_calc
                 content = self.replace_placeholder(content, "TL_REG_CLOSE_DATE", reg_close)
 
             # Video Demo form link - make it a link if provided
