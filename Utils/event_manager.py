@@ -101,6 +101,7 @@ def get_default_config() -> dict:
             "status": "closed",
             "form_link": "",
             "video_demo_form_link": "",
+            "hardware_list_form_link": "",
             "hide_participants": False,
             "registration_open_date_override": "",
             "registration_closes_date_override": "",
@@ -1197,6 +1198,10 @@ class EventManagerApp:
         self.video_demo_form_entry = self.create_labeled_entry(
             frame, "Video Demo Submission Form:", row, reg.get("video_demo_form_link", "")
         )
+        row += 1
+        self.hardware_list_form_entry = self.create_labeled_entry(
+            frame, "Hardware List Submission Form:", row, reg.get("hardware_list_form_link", "")
+        )
 
         # Timeline date overrides
         row += 1
@@ -2060,6 +2065,7 @@ class EventManagerApp:
                 "status": self.reg_status_var.get(),
                 "form_link": self.reg_form_entry.get().strip(),
                 "video_demo_form_link": self.video_demo_form_entry.get().strip(),
+                "hardware_list_form_link": self.hardware_list_form_entry.get().strip(),
                 "hide_participants": self.hide_participants_var.get(),
                 "registration_open_date_override": self.reg_open_date_override_entry.get().strip(),
                 "registration_closes_date_override": self.reg_close_date_override_entry.get().strip(),
@@ -2456,6 +2462,14 @@ class RepositoryUpdater:
             else:
                 video_demo_text = 'Video Demonstration Due'
             content = self.replace_placeholder(content, "TL_VIDEO_DEMO_TEXT", video_demo_text)
+
+            # Hardware list form link - make it a link if provided
+            hardware_list_form = self.reg.get("hardware_list_form_link", "")
+            if hardware_list_form:
+                hardware_list_text = f'<a href="{hardware_list_form}">Hardware List Due</a>'
+            else:
+                hardware_list_text = 'Hardware List Due'
+            content = self.replace_placeholder(content, "TL_HARDWARE_LIST_TEXT", hardware_list_text)
 
             # Orientation 2 row - full element
             o2_calc_date = format_date_display(self.dates.get("orientation_2", "")) if "orientation_2" in self.dates else ""

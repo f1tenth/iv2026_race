@@ -114,7 +114,8 @@ style="font-weight:400;font-style:normal;text-decoration:none;color:#000;backgro
 			<td class="tg-tbri"><span
 					style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent"><!-- TL_REG_CLOSE_DATE --><span style="text-decoration:line-through;color:#c00;">May 15th</span><br><span>June 1st</span><!-- /TL_REG_CLOSE_DATE --></span></td>
 			<td class="tg-npj4"><span style="font-weight:400;font-style:normal">Registration Closes,
-					<!-- TL_VIDEO_DEMO_TEXT --><a href="https://forms.gle/TC169HeL37DqiLf16">Video Demonstration Due</a><!-- /TL_VIDEO_DEMO_TEXT --></span>
+					<!-- TL_VIDEO_DEMO_TEXT --><a href="https://forms.gle/TC169HeL37DqiLf16">Video Demonstration Due</a><!-- /TL_VIDEO_DEMO_TEXT -->,
+						<!-- TL_HARDWARE_LIST_TEXT --><a href="https://forms.gle/ff4BZD3MHQ3kMyDk6">Hardware List Due</a><!-- /TL_HARDWARE_LIST_TEXT --></span>
 			</td>
 		</tr>
 
