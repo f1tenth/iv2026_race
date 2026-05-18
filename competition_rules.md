@@ -155,7 +155,7 @@ Qualification won't be organized as a separate session. The teams will qualify f
 - _Initial placement of the starting cars:_
   - Parallel Start
 - _Tournament type:_
-  - Double Elimination (<span style="color: red"> Tenative </span>)
+  - Single Elimination
 - _Competition model:_
   - Single Cup
     - Seeded with the results of the Time Trial.
