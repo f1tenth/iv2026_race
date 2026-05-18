@@ -123,6 +123,7 @@ def get_default_config() -> dict:
             "registration_url": "",
             "timeline_url": "",
         },
+        "extra_resources": "",
         "organizers": [
             {
                 "name": "Rahul Mangharam",
@@ -509,6 +510,7 @@ class EventManagerApp:
         self.create_results_tab()
         self.create_organizers_tab()
         self.create_registrants_tab()
+        self.create_resources_tab()
 
         # Create bottom button frame
         self.create_button_frame()
@@ -1569,6 +1571,53 @@ class EventManagerApp:
 
         self.registrants_file_path = None
 
+    def create_resources_tab(self) -> None:
+        """Create the Resources tab for adding custom Markdown to race_resources.md."""
+        frame = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(frame, text="Resources")
+
+        frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(2, weight=1)
+
+        ttk.Label(
+            frame,
+            text="Extra resources (Markdown) — appended after orientation links in race_resources.md:",
+            font=("", 10),
+        ).grid(row=0, column=0, sticky=tk.W, padx=5, pady=(10, 2))
+
+        ttk.Label(
+            frame,
+            text="Example:  - [Track Map](https://example.com/track.pdf)",
+            foreground="#a6adc8",
+        ).grid(row=1, column=0, sticky=tk.W, padx=5, pady=(0, 5))
+
+        self.extra_resources_text = tk.Text(
+            frame,
+            height=20,
+            bg="#2a2a3c",
+            fg="#cdd6f4",
+            font=("Ubuntu Mono", 10),
+            relief=tk.FLAT,
+            padx=10,
+            pady=10,
+            insertbackground="#cdd6f4",
+            wrap=tk.NONE,
+        )
+        self.extra_resources_text.grid(row=2, column=0, sticky=tk.NSEW, padx=5, pady=5)
+
+        scrollbar_y = ttk.Scrollbar(frame, command=self.extra_resources_text.yview)
+        scrollbar_y.grid(row=2, column=1, sticky=tk.NS)
+        scrollbar_x = ttk.Scrollbar(frame, orient=tk.HORIZONTAL, command=self.extra_resources_text.xview)
+        scrollbar_x.grid(row=3, column=0, sticky=tk.EW)
+        self.extra_resources_text.config(
+            yscrollcommand=scrollbar_y.set,
+            xscrollcommand=scrollbar_x.set,
+        )
+
+        existing = self.config.get("extra_resources", "")
+        if existing:
+            self.extra_resources_text.insert("1.0", existing)
+
     def create_button_frame(self) -> None:
         """Create the bottom button frame."""
         frame = ttk.Frame(self.root)
@@ -2096,6 +2145,7 @@ class EventManagerApp:
                 for day in ["track_setup", "team_training", "qualification", "race"]
             },
             "organizers": self.organizers_data,
+            "extra_resources": self.extra_resources_text.get("1.0", tk.END).rstrip("\n"),
         }
 
     def save_config(self) -> None:
@@ -2768,6 +2818,10 @@ class RepositoryUpdater:
 
             orientation_content = "\n".join(orientation_lines)
             content = self.replace_placeholder(content, "ORIENTATION_LINKS", orientation_content)
+
+            extra = self.config.get("extra_resources", "").strip()
+            extra_content = f"\n{extra}\n" if extra else ""
+            content = self.replace_placeholder(content, "EXTRA_RESOURCES", extra_content)
 
             if content != original_content:
                 with open(filepath, "w", encoding="utf-8") as f:
