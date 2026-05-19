@@ -125,7 +125,7 @@ style="font-weight:400;font-style:normal;text-decoration:none;color:#000;backgro
 <td class="tg-npj4"><a href="https://upenn.zoom.us/j/97791543385?pwd=3Gcoe5PQdNbNCYA5xR738njk9j6buZ.1"><span style="font-weight:400;font-style:normal">Roboracer Orientation 2 ( Track set up, Track overview for in-person competition, Teams Training )</span></a><br>
 <span
 style="font-weight:400;font-style:normal;text-decoration:none;color:#000;background-color:transparent">
-Slide Video</span>
+<a href="https://docs.google.com/presentation/d/1ahPN-WyFx-Tho9eHN0hBf3TuCQLoUba0buQe1sQR_lU/edit?usp=sharing">Slide</a> <a href="https://drive.google.com/file/d/1rPBZY56nA9lNXReAg7jyeOW1NVvDvIG-/view?usp=sharing">Video</a></span>
 </td>
 </tr><!-- /TL_O2_ROW -->
 

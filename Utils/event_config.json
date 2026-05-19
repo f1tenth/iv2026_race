@@ -36,8 +36,8 @@
         "time_display": "11:00AM - 12:00PM ET",
         "date_override": "May 18th",
         "zoom_link": "https://upenn.zoom.us/j/97791543385?pwd=3Gcoe5PQdNbNCYA5xR738njk9j6buZ.1",
-        "slides_link": "",
-        "video_link": ""
+        "slides_link": "https://docs.google.com/presentation/d/1ahPN-WyFx-Tho9eHN0hBf3TuCQLoUba0buQe1sQR_lU/edit?usp=sharing",
+        "video_link": "https://drive.google.com/file/d/1rPBZY56nA9lNXReAg7jyeOW1NVvDvIG-/view?usp=sharing"
     },
     "registration": {
         "status": "open",
@@ -148,5 +148,5 @@
             "image": "images/organizer/mohamed_elgouhary.jpeg"
         }
     ],
-    "extra_resources": "\n- [Tentative Track Layout](https://drive.google.com/drive/folders/1ksPKtgBcAEvPlKNH1UlEgSw4eFwRfTI9?usp=sharing)"
+    "extra_resources": "\n- [Tentative Track Layout](https://drive.google.com/drive/folders/15Ttya6YwIzBFxS89_G5Lkj7kNVTLeBHK?usp=sharing)"
 }
