@@ -17,16 +17,18 @@ import json
 import os
 import re
 import tkinter as tk
+import webbrowser
 from datetime import datetime, timedelta
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Any
 
 import cairosvg
-import pandas as pd
 from PIL import Image
 from tkcalendar import Calendar
 from ttkthemes import ThemedTk
+
+import certification as cert
 
 # Get the directory where this script is located
 SCRIPT_DIR = Path(__file__).parent
@@ -124,6 +126,16 @@ def get_default_config() -> dict:
             "timeline_url": "",
         },
         "extra_resources": "",
+        "certification": {
+            "csv_paths": {"registration": "", "video": "", "hardware": ""},
+            "ticks": {},
+            "overrides": {
+                "submission_links": {},
+                "ignored_submissions": [],
+                "blocked_links": [],
+                "allowed_links": [],
+            },
+        },
         "organizers": [
             {
                 "name": "Rahul Mangharam",
@@ -497,6 +509,12 @@ class EventManagerApp:
         # Load configuration
         self.config = load_config()
 
+        # Certification state (persisted under config["certification"]).
+        self.certification_data = self.config.get(
+            "certification", get_default_config()["certification"]
+        )
+        self.cert_teams: list = []  # last processed Team objects
+
         # Create main notebook (tabs)
         self.notebook = ttk.Notebook(root)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -635,6 +653,64 @@ class EventManagerApp:
 
         # Configure separators
         style.configure("TSeparator", background=border)
+
+        # Configure label frames (section cards) with an accent title
+        style.configure(
+            "TLabelframe",
+            background=bg_dark,
+            bordercolor=border,
+            relief="solid",
+            borderwidth=1,
+        )
+        style.configure(
+            "TLabelframe.Label",
+            background=bg_dark,
+            foreground=accent,
+            font=main_font_bold,
+        )
+
+        # Configure tree views (registrants / certification tables)
+        style.configure(
+            "Treeview",
+            background=bg_surface,
+            fieldbackground=bg_surface,
+            foreground=text_primary,
+            borderwidth=0,
+            rowheight=24,
+            font=main_font,
+        )
+        style.map(
+            "Treeview",
+            background=[("selected", accent)],
+            foreground=[("selected", bg_dark)],
+        )
+        style.configure(
+            "Treeview.Heading",
+            background=bg_dark,
+            foreground=accent,
+            font=main_font_bold,
+            borderwidth=0,
+            padding=[6, 6],
+        )
+        style.map("Treeview.Heading", background=[("active", bg_hover)])
+
+        # Configure comboboxes (certification submission/registration pickers)
+        style.configure(
+            "TCombobox",
+            fieldbackground=bg_surface,
+            background=bg_surface,
+            foreground=text_primary,
+            arrowcolor=text_primary,
+            bordercolor=border,
+            padding=6,
+        )
+        style.map(
+            "TCombobox",
+            fieldbackground=[("readonly", bg_surface)],
+            foreground=[("readonly", text_primary)],
+            selectbackground=[("readonly", bg_surface)],
+            selectforeground=[("readonly", text_primary)],
+        )
 
         # Configure text widget colors (for preview areas)
         self.text_bg = bg_surface
@@ -1515,61 +1591,509 @@ class EventManagerApp:
             children = self.organizers_tree.get_children()
             self.organizers_tree.selection_set(children[index + 1])
 
+    # ------------------------------------------------------------------
+    # Certification tab
+    # ------------------------------------------------------------------
+
+    # Filename globs used to auto-locate the three Form CSV exports.
+    CERT_FILE_GLOBS = {
+        cert.FORM_REGISTRATION: "*Registration*Form Responses.csv",
+        cert.FORM_VIDEO: "*VideoSubmission*Form Responses.csv",
+        cert.FORM_HARDWARE: "*HardwareList*Form Responses.csv",
+    }
+    CERT_FORM_LABELS = {
+        cert.FORM_REGISTRATION: "Registration CSV",
+        cert.FORM_VIDEO: "Video Submission CSV",
+        cert.FORM_HARDWARE: "Hardware List CSV",
+    }
+    CERT_BADGE_COLORS = {
+        cert.LINK_OK: "#a6e3a1",
+        cert.LINK_SUSPICIOUS: "#f9e2af",
+        cert.LINK_BLOCKED: "#f38ba8",
+        cert.LINK_NONE: "#a6adc8",
+    }
+
+    def _cert_default_path(self, form: str) -> str:
+        """Return saved CSV path for a form, or auto-detect one in Utils/."""
+        saved = self.certification_data.get("csv_paths", {}).get(form, "")
+        if saved and Path(saved).exists():
+            return saved
+        matches = sorted(SCRIPT_DIR.glob(self.CERT_FILE_GLOBS[form]))
+        return str(matches[0]) if matches else ""
+
     def create_registrants_tab(self) -> None:
-        """Create the Registrants tab."""
+        """Create the Certification tab (3-CSV matching + certification)."""
         frame = ttk.Frame(self.notebook, padding=10)
-        self.notebook.add(frame, text="Registrants")
+        self.notebook.add(frame, text="Certification")
 
         frame.columnconfigure(0, weight=1)
-        frame.rowconfigure(3, weight=1)
+        frame.rowconfigure(2, weight=2)
+        frame.rowconfigure(4, weight=1)
 
-        row = 0
-        ttk.Label(
-            frame,
-            text="Import registrants from Video Demo Checklist Excel file:",
-            font=("", 10),
-        ).grid(row=row, column=0, sticky=tk.W, padx=5, pady=10)
+        # --- File pickers ---------------------------------------------
+        files_frame = ttk.LabelFrame(frame, text="Form responses (CSV)", padding=8)
+        files_frame.grid(row=0, column=0, sticky=tk.EW, padx=5, pady=(0, 8))
+        files_frame.columnconfigure(1, weight=1)
 
-        row += 1
-        btn_frame = ttk.Frame(frame)
-        btn_frame.grid(row=row, column=0, sticky=tk.W, padx=5, pady=5)
+        self.cert_path_vars: dict[str, tk.StringVar] = {}
+        for i, form in enumerate(
+            (cert.FORM_REGISTRATION, cert.FORM_VIDEO, cert.FORM_HARDWARE)
+        ):
+            ttk.Label(files_frame, text=self.CERT_FORM_LABELS[form] + ":").grid(
+                row=i, column=0, sticky=tk.W, padx=5, pady=3
+            )
+            var = tk.StringVar(value=self._cert_default_path(form))
+            self.cert_path_vars[form] = var
+            ttk.Entry(files_frame, textvariable=var).grid(
+                row=i, column=1, sticky=tk.EW, padx=5, pady=3
+            )
+            ttk.Button(
+                files_frame,
+                text="Browse",
+                command=lambda f=form: self.browse_cert_file(f),
+            ).grid(row=i, column=2, padx=5, pady=3)
 
+        action_frame = ttk.Frame(frame)
+        action_frame.grid(row=1, column=0, sticky=tk.EW, padx=5, pady=(0, 6))
         ttk.Button(
-            btn_frame, text="Select Excel File", command=self.select_registrants_file
-        ).pack(side=tk.LEFT, padx=5)
+            action_frame,
+            text="Process / Reprocess",
+            command=self.process_certification,
+            style="Accent.TButton",
+        ).pack(side=tk.LEFT)
+        self.cert_status_label = ttk.Label(action_frame, text="Not processed yet.")
+        self.cert_status_label.pack(side=tk.LEFT, padx=12)
+
+        # --- Candidate teams tree -------------------------------------
+        cand_frame = ttk.LabelFrame(
+            frame, text="Candidate teams (submitted video AND hardware)", padding=4
+        )
+        cand_frame.grid(row=2, column=0, sticky=tk.NSEW, padx=5, pady=4)
+        cand_frame.columnconfigure(0, weight=1)
+        cand_frame.rowconfigure(0, weight=1)
+
+        cols = ("team", "affiliation", "reg", "video", "hardware", "certified")
+        headers = {
+            "team": "Team",
+            "affiliation": "Affiliation",
+            "reg": "Registered",
+            "video": "Video",
+            "hardware": "Hardware",
+            "certified": "Certified",
+        }
+        widths = {
+            "team": 180,
+            "affiliation": 200,
+            "reg": 80,
+            "video": 110,
+            "hardware": 110,
+            "certified": 80,
+        }
+        self.cert_tree = ttk.Treeview(
+            cand_frame, columns=cols, show="headings", height=9, selectmode="browse"
+        )
+        for c in cols:
+            self.cert_tree.heading(c, text=headers[c])
+            self.cert_tree.column(c, width=widths[c], anchor=tk.W)
+        self.cert_tree.tag_configure("unmatched", foreground="#f9e2af")
+        self.cert_tree.tag_configure("certified", foreground="#a6e3a1")
+        self.cert_tree.grid(row=0, column=0, sticky=tk.NSEW)
+        cand_scroll = ttk.Scrollbar(cand_frame, command=self.cert_tree.yview)
+        cand_scroll.grid(row=0, column=1, sticky=tk.NS)
+        self.cert_tree.config(yscrollcommand=cand_scroll.set)
+        self.cert_tree.bind("<<TreeviewSelect>>", self.on_cert_tree_select)
+
+        # --- Detail panel ---------------------------------------------
+        detail = ttk.LabelFrame(frame, text="Selected team", padding=6)
+        detail.grid(row=3, column=0, sticky=tk.EW, padx=5, pady=4)
+        detail.columnconfigure(0, weight=1)
+        detail.columnconfigure(1, weight=1)
+
+        self.cert_team_label = ttk.Label(
+            detail, text="Select a team above.", style="Header.TLabel"
+        )
+        self.cert_team_label.grid(row=0, column=0, columnspan=2, sticky=tk.W, pady=(0, 6))
+
+        self.cert_blocks: dict[str, dict] = {}
+        self._build_submission_block(detail, cert.FORM_VIDEO, "Video Demo", col=0)
+        self._build_submission_block(detail, cert.FORM_HARDWARE, "Hardware List", col=1)
+
+        # --- Not considered list --------------------------------------
+        nc_frame = ttk.LabelFrame(
+            frame, text="Not considered (missing video or hardware)", padding=4
+        )
+        nc_frame.grid(row=4, column=0, sticky=tk.NSEW, padx=5, pady=(4, 0))
+        nc_frame.columnconfigure(0, weight=1)
+        nc_frame.rowconfigure(0, weight=1)
+        nc_cols = ("team", "reg", "video", "hardware")
+        self.cert_nc_tree = ttk.Treeview(
+            nc_frame, columns=nc_cols, show="headings", height=5
+        )
+        for c, h, w in (
+            ("team", "Team", 220),
+            ("reg", "Registered", 90),
+            ("video", "Video", 90),
+            ("hardware", "Hardware", 90),
+        ):
+            self.cert_nc_tree.heading(c, text=h)
+            self.cert_nc_tree.column(c, width=w, anchor=tk.W)
+        self.cert_nc_tree.grid(row=0, column=0, sticky=tk.NSEW)
+        nc_scroll = ttk.Scrollbar(nc_frame, command=self.cert_nc_tree.yview)
+        nc_scroll.grid(row=0, column=1, sticky=tk.NS)
+        self.cert_nc_tree.config(yscrollcommand=nc_scroll.set)
+
+        # Auto-process if all three files are available.
+        if all(self.cert_path_vars[f].get() for f in self.cert_path_vars):
+            self.process_certification(silent=True)
+
+    def _build_submission_block(
+        self, parent: ttk.Frame, form: str, title: str, col: int
+    ) -> None:
+        """Build the per-form (video/hardware) detail widgets."""
+        box = ttk.LabelFrame(parent, text=title, padding=6)
+        box.grid(row=1, column=col, sticky=tk.NSEW, padx=4, pady=4)
+        box.columnconfigure(0, weight=1)
+
+        satisfied_var = tk.BooleanVar(value=False)
+        chk = ttk.Checkbutton(
+            box,
+            text=f"{title} satisfied (hand-checked)",
+            variable=satisfied_var,
+            command=lambda f=form: self.cert_toggle_satisfied(f),
+        )
+        chk.grid(row=0, column=0, sticky=tk.W, pady=(0, 4))
+
+        ttk.Label(box, text="Submission (latest first):").grid(
+            row=1, column=0, sticky=tk.W
+        )
+        combo = ttk.Combobox(box, state="readonly", values=[])
+        combo.grid(row=2, column=0, sticky=tk.EW, pady=2)
+        combo.bind("<<ComboboxSelected>>", lambda e, f=form: self._refresh_block_link(f))
+
+        info = ttk.Label(box, text="", foreground="#a6adc8")
+        info.grid(row=3, column=0, sticky=tk.W, pady=2)
+
+        ttk.Label(box, text="Submitted link (verify before opening):").grid(
+            row=4, column=0, sticky=tk.W
+        )
+        url_entry = ttk.Entry(box)
+        url_entry.grid(row=5, column=0, sticky=tk.EW, pady=2)
+
+        badge = tk.Label(box, text="", anchor=tk.W, bg="#1e1e2e")
+        badge.grid(row=6, column=0, sticky=tk.EW, pady=2)
+
+        btns = ttk.Frame(box)
+        btns.grid(row=7, column=0, sticky=tk.W, pady=2)
+        open_btn = ttk.Button(
+            btns, text="Open Link", command=lambda f=form: self.cert_open_link(f)
+        )
+        open_btn.pack(side=tk.LEFT, padx=(0, 4))
+        mark_btn = ttk.Button(
+            btns, text="Mark malicious", command=lambda f=form: self.cert_toggle_malicious(f)
+        )
+        mark_btn.pack(side=tk.LEFT, padx=4)
+        ignore_btn = ttk.Button(
+            btns, text="Ignore submission", command=lambda f=form: self.cert_ignore_submission(f)
+        )
+        ignore_btn.pack(side=tk.LEFT, padx=4)
+
+        ttk.Label(box, text="Manually link this submission to registration:").grid(
+            row=8, column=0, sticky=tk.W, pady=(6, 0)
+        )
+        link_combo = ttk.Combobox(box, state="readonly", values=[])
+        link_combo.grid(row=9, column=0, sticky=tk.EW, pady=2)
         ttk.Button(
-            btn_frame, text="Generate Registrants Table", command=self.generate_registrants_table
-        ).pack(side=tk.LEFT, padx=5)
+            box, text="Apply link", command=lambda f=form: self.cert_apply_manual_link(f)
+        ).grid(row=10, column=0, sticky=tk.W, pady=2)
 
-        row += 1
-        self.registrants_file_label = ttk.Label(frame, text="No file selected")
-        self.registrants_file_label.grid(row=row, column=0, sticky=tk.W, padx=5, pady=5)
+        self.cert_blocks[form] = {
+            "satisfied_var": satisfied_var,
+            "satisfied_chk": chk,
+            "combo": combo,
+            "info": info,
+            "url_entry": url_entry,
+            "badge": badge,
+            "open_btn": open_btn,
+            "mark_btn": mark_btn,
+            "ignore_btn": ignore_btn,
+            "link_combo": link_combo,
+            "subs": [],  # submissions for the current team, latest first
+        }
 
-        row += 1
-        ttk.Label(frame, text="Preview:").grid(
-            row=row, column=0, sticky=tk.W, padx=5, pady=5
+    # ---- Certification helpers ---------------------------------------
+
+    def browse_cert_file(self, form: str) -> None:
+        filename = filedialog.askopenfilename(
+            title=f"Select {self.CERT_FORM_LABELS[form]}",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            initialdir=SCRIPT_DIR,
         )
-        row += 1
-        self.registrants_preview = tk.Text(
-            frame,
-            height=15,
-            width=80,
-            bg="#2a2a3c",
-            fg="#cdd6f4",
-            font=("Ubuntu Mono", 10),
-            relief=tk.FLAT,
-            padx=10,
-            pady=10,
-        )
-        self.registrants_preview.grid(
-            row=row, column=0, sticky=tk.NSEW, padx=5, pady=5
+        if filename:
+            self.cert_path_vars[form].set(filename)
+
+    @property
+    def _cert_overrides(self) -> dict:
+        ov = self.certification_data.setdefault("overrides", {})
+        ov.setdefault("submission_links", {})
+        ov.setdefault("ignored_submissions", [])
+        ov.setdefault("blocked_links", [])
+        ov.setdefault("allowed_links", [])
+        return ov
+
+    def process_certification(self, silent: bool = False) -> None:
+        """Load the three CSVs, run matching, and refresh the views."""
+        paths = {f: self.cert_path_vars[f].get().strip() for f in self.cert_path_vars}
+        missing = [self.CERT_FORM_LABELS[f] for f, p in paths.items() if not p or not Path(p).exists()]
+        if missing:
+            if not silent:
+                messagebox.showwarning(
+                    "Missing files",
+                    "Select valid files for:\n- " + "\n- ".join(missing),
+                )
+            return
+        try:
+            regs = cert.load_registrations(paths[cert.FORM_REGISTRATION])
+            videos = cert.load_video_submissions(paths[cert.FORM_VIDEO])
+            hardware = cert.load_hardware_submissions(paths[cert.FORM_HARDWARE])
+            self.cert_registrations = regs
+            self.cert_teams = cert.build_teams(
+                regs,
+                videos,
+                hardware,
+                overrides=self._cert_overrides,
+                ticks=self.certification_data.get("ticks", {}),
+            )
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to process CSVs: {e}")
+            return
+
+        # Persist the resolved paths.
+        self.certification_data["csv_paths"] = paths
+        self.refresh_cert_trees()
+        n_cand = sum(1 for t in self.cert_teams if t.is_candidate)
+        n_cert = sum(1 for t in self.cert_teams if t.certified)
+        self.cert_status_label.config(
+            text=f"{len(regs)} regs, {len(videos)} videos, {len(hardware)} hardware - "
+            f"{n_cand} candidates, {n_cert} certified."
         )
 
-        scrollbar = ttk.Scrollbar(frame, command=self.registrants_preview.yview)
-        scrollbar.grid(row=row, column=1, sticky=tk.NS)
-        self.registrants_preview.config(yscrollcommand=scrollbar.set)
+    def _team_by_key(self, key: str):
+        for t in self.cert_teams:
+            if t.team_key == key:
+                return t
+        return None
 
-        self.registrants_file_path = None
+    def refresh_cert_trees(self) -> None:
+        prev = self.cert_tree.selection()
+        prev_key = prev[0] if prev else None
+        self.cert_tree.delete(*self.cert_tree.get_children())
+        self.cert_nc_tree.delete(*self.cert_nc_tree.get_children())
+
+        def yn(v: bool) -> str:
+            return "Yes" if v else "No"
+
+        for t in self.cert_teams:
+            if t.is_candidate:
+                tags = []
+                if t.certified:
+                    tags.append("certified")
+                elif not t.registration_matched:
+                    tags.append("unmatched")
+                self.cert_tree.insert(
+                    "", tk.END, iid=t.team_key,
+                    values=(
+                        t.display_name,
+                        t.affiliation,
+                        yn(t.registration_matched),
+                        "satisfied" if t.video_satisfied else "submitted",
+                        "satisfied" if t.hardware_satisfied else "submitted",
+                        yn(t.certified),
+                    ),
+                    tags=tags,
+                )
+            else:
+                self.cert_nc_tree.insert(
+                    "", tk.END, iid=t.team_key,
+                    values=(
+                        t.display_name,
+                        yn(t.registration_matched),
+                        yn(t.has_video),
+                        yn(t.has_hardware),
+                    ),
+                )
+
+        if prev_key and self.cert_tree.exists(prev_key):
+            self.cert_tree.selection_set(prev_key)
+        else:
+            self._clear_detail()
+
+    def _clear_detail(self) -> None:
+        self.cert_team_label.config(text="Select a team above.")
+        for form in self.cert_blocks:
+            b = self.cert_blocks[form]
+            b["subs"] = []
+            b["combo"]["values"] = []
+            b["combo"].set("")
+            b["link_combo"]["values"] = []
+            b["link_combo"].set("")
+            b["info"].config(text="")
+            self._set_entry(b["url_entry"], "")
+            b["badge"].config(text="", bg="#1e1e2e")
+            b["satisfied_var"].set(False)
+
+    @staticmethod
+    def _set_entry(entry: ttk.Entry, text: str) -> None:
+        entry.config(state="normal")
+        entry.delete(0, tk.END)
+        entry.insert(0, text)
+        entry.config(state="readonly")
+
+    def on_cert_tree_select(self, event=None) -> None:
+        sel = self.cert_tree.selection()
+        if not sel:
+            return
+        team = self._team_by_key(sel[0])
+        if not team:
+            return
+        self.cert_team_label.config(
+            text=f"{team.display_name}   |   {team.affiliation or 'no affiliation'}   |   "
+            f"{'registered' if team.registration_matched else 'NOT MATCHED to a registration'}"
+        )
+        reg_names = [r.display_name for r in getattr(self, "cert_registrations", [])]
+        for form, subs in (
+            (cert.FORM_VIDEO, team.all_video),
+            (cert.FORM_HARDWARE, team.all_hardware),
+        ):
+            b = self.cert_blocks[form]
+            ordered = sorted(
+                subs, key=lambda s: (s.timestamp or datetime.min), reverse=True
+            )
+            b["subs"] = ordered
+            b["combo"]["values"] = [self._sub_label(s) for s in ordered]
+            if ordered:
+                b["combo"].current(0)
+            else:
+                b["combo"].set("")
+            b["link_combo"]["values"] = reg_names
+            b["link_combo"].set("")
+            satisfied = (
+                team.video_satisfied if form == cert.FORM_VIDEO else team.hardware_satisfied
+            )
+            b["satisfied_var"].set(satisfied)
+            self._refresh_block_link(form)
+
+    def _sub_label(self, sub) -> str:
+        ts = sub.timestamp.strftime("%Y-%m-%d %H:%M") if sub.timestamp else "no date"
+        return f"{ts} - {sub.submitter_name or sub.submitter_email or '?'}"
+
+    def _selected_sub(self, form: str):
+        b = self.cert_blocks[form]
+        idx = b["combo"].current()
+        if idx < 0 or idx >= len(b["subs"]):
+            return None
+        return b["subs"][idx]
+
+    def _refresh_block_link(self, form: str) -> None:
+        b = self.cert_blocks[form]
+        sub = self._selected_sub(form)
+        if not sub:
+            b["info"].config(text="No submission.")
+            self._set_entry(b["url_entry"], "")
+            b["badge"].config(text="", bg="#1e1e2e")
+            return
+        b["info"].config(
+            text=f"by {sub.submitter_name} <{sub.submitter_email}> - team as submitted: "
+            f"\"{sub.team_name}\"  ({sub.match_reason})"
+        )
+        display = sub.primary_link or sub.raw_cell
+        self._set_entry(b["url_entry"], display)
+        ov = self._cert_overrides
+        status, reasons = sub.link_status(
+            set(ov["blocked_links"]), set(ov["allowed_links"])
+        )
+        color = self.CERT_BADGE_COLORS.get(status, "#a6adc8")
+        b["badge"].config(text=f"  {status.upper()}: {'; '.join(reasons)}", fg="#11111b", bg=color)
+        # Open disabled for blocked / no-link.
+        b["open_btn"].config(
+            state=("disabled" if status in (cert.LINK_BLOCKED, cert.LINK_NONE) else "normal")
+        )
+        marked = sub.primary_link in ov["blocked_links"]
+        b["mark_btn"].config(text="Unmark malicious" if marked else "Mark malicious")
+
+    def cert_open_link(self, form: str) -> None:
+        sub = self._selected_sub(form)
+        if not sub or not sub.primary_link:
+            return
+        url = sub.primary_link
+        if messagebox.askyesno(
+            "Open external link?",
+            f"About to open this link in your browser:\n\n{url}\n\nProceed?",
+        ):
+            webbrowser.open(url)
+
+    def cert_toggle_malicious(self, form: str) -> None:
+        sub = self._selected_sub(form)
+        if not sub or not sub.primary_link:
+            return
+        url = sub.primary_link
+        blocked = self._cert_overrides["blocked_links"]
+        if url in blocked:
+            blocked.remove(url)
+        else:
+            blocked.append(url)
+        self._refresh_block_link(form)
+
+    def cert_ignore_submission(self, form: str) -> None:
+        sub = self._selected_sub(form)
+        if not sub:
+            return
+        if not messagebox.askyesno(
+            "Ignore submission",
+            "Mark this submission as redundant/ignored? It will be removed from "
+            "consideration (the next-latest submission, if any, takes over).",
+        ):
+            return
+        self._cert_overrides["ignored_submissions"].append(sub.submission_id)
+        self.process_certification(silent=True)
+
+    def cert_toggle_satisfied(self, form: str) -> None:
+        sel = self.cert_tree.selection()
+        if not sel:
+            return
+        team = self._team_by_key(sel[0])
+        if not team:
+            return
+        ticks = self.certification_data.setdefault("ticks", {})
+        entry = ticks.setdefault(
+            team.team_key, {"video_satisfied": False, "hardware_satisfied": False}
+        )
+        val = self.cert_blocks[form]["satisfied_var"].get()
+        key = "video_satisfied" if form == cert.FORM_VIDEO else "hardware_satisfied"
+        entry[key] = val
+        if form == cert.FORM_VIDEO:
+            team.video_satisfied = val
+        else:
+            team.hardware_satisfied = val
+        self.refresh_cert_trees()
+
+    def cert_apply_manual_link(self, form: str) -> None:
+        sub = self._selected_sub(form)
+        if not sub:
+            return
+        choice = self.cert_blocks[form]["link_combo"].get()
+        if not choice:
+            messagebox.showinfo("Manual link", "Pick a registration first.")
+            return
+        reg = next(
+            (r for r in getattr(self, "cert_registrations", []) if r.display_name == choice),
+            None,
+        )
+        if not reg:
+            return
+        self._cert_overrides["submission_links"][sub.submission_id] = reg.team_key
+        self.process_certification(silent=True)
+        if self.cert_tree.exists(reg.team_key):
+            self.cert_tree.selection_set(reg.team_key)
 
     def create_resources_tab(self) -> None:
         """Create the Resources tab for adding custom Markdown to race_resources.md."""
@@ -1971,95 +2495,6 @@ class EventManagerApp:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to calculate dates: {e}")
 
-    def select_registrants_file(self) -> None:
-        """Open file dialog to select registrants Excel file."""
-        filename = filedialog.askopenfilename(
-            title="Select Video Demo Checklist Excel File",
-            filetypes=[("Excel files", "*.xlsx *.xls"), ("All files", "*.*")],
-            initialdir=SCRIPT_DIR,
-        )
-        if filename:
-            self.registrants_file_path = filename
-            self.registrants_file_label.config(text=f"Selected: {Path(filename).name}")
-
-    def generate_registrants_table(self) -> None:
-        """Generate registrants HTML table from Excel file."""
-        if not self.registrants_file_path:
-            messagebox.showwarning("Warning", "Please select an Excel file first.")
-            return
-
-        try:
-            # Read the Excel file
-            df = pd.read_excel(
-                self.registrants_file_path, sheet_name="Data", header=1, usecols="B:G"
-            )
-
-            # Filter rows where "Video Demo Submitted?" is True
-            submitted_teams = df[df["Video Demo Submitted?"] == True]
-
-            # Build HTML table
-            html_table = """
-<table>
-    <thead>
-        <tr>
-            <th style="text-align: left">TEAM NAME</th>
-            <th style="text-align: left">AFFILIATION</th>
-            <th style="text-align: left">TEAM MEMBERS</th>
-        </tr>
-    </thead>
-    <tbody>
-"""
-            for _, row in submitted_teams.iterrows():
-                team_name = row["Team Name"]
-                affiliation = row["Affiliation"]
-                team_members = row["Team Names"]
-
-                if pd.isna(team_members):
-                    team_members = "N/A"
-
-                # Clean up team members string
-                match = re.search(r":\s*(.+)", str(team_members))
-                if match:
-                    team_members = match.group(1).strip()
-
-                # Remove email addresses
-                team_members = re.sub(r"\S+@\S+", "", str(team_members))
-                team_members = re.sub(r"\([^)]*\S+@\S+[^)]*\)", "", team_members)
-                team_members = re.sub(r"^\s*\d+\)\s*", "", team_members)
-
-                # Split into individual names
-                names = team_members.strip().split()
-                members = [" ".join(names[i : i + 2]) for i in range(0, len(names), 2)]
-                team_members_html = "<br>".join(members)
-
-                html_table += f"""
-        <tr>
-            <td style="text-align: left">{team_name}</td>
-            <td style="text-align: left">{affiliation}</td>
-            <td style="text-align: left">{team_members_html}</td>
-        </tr>
-"""
-
-            html_table += """
-    </tbody>
-</table>
-"""
-
-            # Show preview
-            self.registrants_preview.delete("1.0", tk.END)
-            self.registrants_preview.insert("1.0", html_table)
-
-            # Save to file
-            output_path = PROJECT_ROOT / "registrants_table.html"
-            with open(output_path, "w", encoding="utf-8") as f:
-                f.write(html_table)
-
-            messagebox.showinfo(
-                "Success", f"Registrants table generated and saved to:\n{output_path}"
-            )
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to generate table: {e}")
-
     def collect_config(self) -> dict:
         """Collect all configuration from GUI fields."""
         # Parse twitch domains
@@ -2146,6 +2581,7 @@ class EventManagerApp:
             },
             "organizers": self.organizers_data,
             "extra_resources": self.extra_resources_text.get("1.0", tk.END).rstrip("\n"),
+            "certification": self.certification_data,
         }
 
     def save_config(self) -> None:
@@ -2629,6 +3065,34 @@ class RepositoryUpdater:
 
         return content
 
+    def _certified_participant_rows(self) -> str:
+        """Build participant <tr> rows for certified teams from certification config.
+
+        Returns an empty string if the CSVs aren't configured/available so the
+        participants table simply renders empty (unchanged behaviour).
+        """
+        certc = self.config.get("certification", {})
+        paths = certc.get("csv_paths", {})
+        reg_p = paths.get("registration", "")
+        vid_p = paths.get("video", "")
+        hw_p = paths.get("hardware", "")
+        if not (reg_p and vid_p and hw_p):
+            return ""
+        if not (Path(reg_p).exists() and Path(vid_p).exists() and Path(hw_p).exists()):
+            return ""
+        try:
+            regs = cert.load_registrations(reg_p)
+            videos = cert.load_video_submissions(vid_p)
+            hardware = cert.load_hardware_submissions(hw_p)
+            teams = cert.build_teams(
+                regs, videos, hardware,
+                overrides=certc.get("overrides", {}),
+                ticks=certc.get("ticks", {}),
+            )
+            return cert.render_participant_rows(teams)
+        except Exception:
+            return ""
+
     def _update_registration_html(self, content: str) -> str:
         """Update registration.html using placeholder markers."""
         reg_status = self.reg.get("status", "closed")
@@ -2686,7 +3150,8 @@ class RepositoryUpdater:
 				''')
             content = self.replace_placeholder(content, "PARTICIPANTS_SECTION", hidden_section)
         else:
-            # Show participants section
+            # Show participants section, populated with certified teams.
+            participant_rows = self._certified_participant_rows()
             visible_section = self._clean_html('''
 				<hr>
 				<h3 id="participants">Participants</h3>
@@ -2705,6 +3170,7 @@ class RepositoryUpdater:
 						</tr>
 					</thead>
 					<tbody>
+''' + participant_rows + '''
 					</tbody>
 				</table>
 				''')

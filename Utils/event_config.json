@@ -40,11 +40,11 @@
         "video_link": "https://drive.google.com/file/d/1rPBZY56nA9lNXReAg7jyeOW1NVvDvIG-/view?usp=sharing"
     },
     "registration": {
-        "status": "open",
+        "status": "closed",
         "form_link": "https://forms.gle/Dgcv3Ta1Aq354GtA7",
         "video_demo_form_link": "https://forms.gle/TC169HeL37DqiLf16",
         "hardware_list_form_link": "https://forms.gle/ff4BZD3MHQ3kMyDk6",
-        "hide_participants": true,
+        "hide_participants": false,
         "registration_open_date_override": "",
         "registration_closes_date_override": "June 1st"
     },
@@ -124,6 +124,14 @@
             "institution": "University of Pennsylvania"
         },
         {
+            "name": "Mohamed Elgouhary",
+            "profile_url": "https://mohamed-elgouhary.github.io/",
+            "title": "PH.D. CANDIDATE",
+            "department": "Lane Department of Computer Science and Electrical Engineering",
+            "institution": "West Virginia University",
+            "image": "images/organizer/mohamed_elgouhary.jpeg"
+        },
+        {
             "name": "Chinmay Samak",
             "image": "images/organizer/Chinmay_Samak.jpg",
             "profile_url": "mailto:csamak@clemson.edu",
@@ -138,15 +146,66 @@
             "title": "Ph.D. Candidate",
             "department": "Department of Automotive Engineering",
             "institution": "Clemson University - ICAR"
-        },
-        {
-            "name": "Mohamed Elgouhary",
-            "profile_url": "https://mohamed-elgouhary.github.io/",
-            "title": "PH.D. CANDIDATE",
-            "department": "Lane Department of Computer Science and Electrical Engineering",
-            "institution": "West Virginia University",
-            "image": "images/organizer/mohamed_elgouhary.jpeg"
         }
     ],
-    "extra_resources": "\n- [Tentative Track Layout](https://drive.google.com/drive/folders/15Ttya6YwIzBFxS89_G5Lkj7kNVTLeBHK?usp=sharing)"
+    "extra_resources": "\n- [Tentative Track Layout](https://drive.google.com/drive/folders/15Ttya6YwIzBFxS89_G5Lkj7kNVTLeBHK?usp=sharing)",
+    "certification": {
+        "csv_paths": {
+            "registration": "/home/ahmad/Development/Roboracer Dev/Roboracer_Websites/iv2026_race/Utils/IV2026-Roboracer-Registration (Responses) - Form Responses.csv",
+            "video": "/home/ahmad/Development/Roboracer Dev/Roboracer_Websites/iv2026_race/Utils/IV2026-Roboracer-VideoSubmission (Responses) - Form Responses.csv",
+            "hardware": "/home/ahmad/Development/Roboracer Dev/Roboracer_Websites/iv2026_race/Utils/IV2026-Roboracer-HardwareListSubmission (Responses) - Form Responses.csv"
+        },
+        "ticks": {
+            "404 racers": {
+                "video_satisfied": true,
+                "hardware_satisfied": true
+            },
+            "air uop": {
+                "video_satisfied": true,
+                "hardware_satisfied": true
+            },
+            "boiler autonomy": {
+                "video_satisfied": true,
+                "hardware_satisfied": true
+            },
+            "cavrel apex": {
+                "video_satisfied": true,
+                "hardware_satisfied": true
+            },
+            "mi3 uc merced": {
+                "video_satisfied": true,
+                "hardware_satisfied": true
+            },
+            "racingjags": {
+                "video_satisfied": true,
+                "hardware_satisfied": true
+            },
+            "ram": {
+                "video_satisfied": true,
+                "hardware_satisfied": true
+            },
+            "riverside racers": {
+                "video_satisfied": true,
+                "hardware_satisfied": true
+            },
+            "thunderbolt upenn": {
+                "video_satisfied": true,
+                "hardware_satisfied": true
+            },
+            "tartan racing": {
+                "video_satisfied": true,
+                "hardware_satisfied": true
+            },
+            "ucf cavrel blaze racer": {
+                "video_satisfied": true,
+                "hardware_satisfied": true
+            }
+        },
+        "overrides": {
+            "submission_links": {},
+            "ignored_submissions": [],
+            "blocked_links": [],
+            "allowed_links": []
+        }
+    }
 }

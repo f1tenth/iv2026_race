@@ -46,10 +46,25 @@ uv run python Utils/event_manager.py
    - Head-to-head bracket link
    - YouTube/Twitch streaming settings
 
-6. **Registrants Tab** - Import participants:
-   - Import from Video Demo Checklist Excel file
-   - Generate HTML table for the website
-   - Preview before applying
+6. **Certification Tab** - Certify teams from the three Google-Form CSV exports:
+   - Load the Registration, Video Submission, and Hardware List CSVs (auto-detected
+     in `Utils/`; paths are remembered between sessions)
+   - **Process / Reprocess** matches submissions to registrations even when a
+     different team member submitted each form and team names are inconsistent
+     (exact → member email/name → fuzzy name → manual override)
+   - Only **candidate teams** (submitted *both* a video and a hardware list) are
+     shown for checking; teams missing either appear under "Not considered"
+   - Per submission: see the submitter, the **raw link** (always shown so you can
+     inspect it), an offline **safety badge** (ok / suspicious / blocked / no-link),
+     an **Open Link** button (with a confirmation showing the full URL; disabled for
+     blocked/no-link), **Mark malicious**, **Ignore submission**, and a dropdown of
+     older submissions (only the latest counts)
+   - Tick **Video satisfied** and **Hardware satisfied** individually; once both are
+     ticked *and* the team is matched to a registration it becomes **certified**
+   - Use **Manually link this submission to registration** to fix mismatches
+   - Re-run any time after new responses arrive — your ticks and overrides persist
+   - On **Apply to Repository**, certified teams populate the Participants table on
+     the registration page
 
 ### Configuration File
 
@@ -87,8 +102,13 @@ Adjust these offsets in the Dates & Timeline tab as needed.
 
 ## Files
 
-- `event_config.json` - Current event configuration (JSON)
+- `event_config.json` - Current event configuration (JSON), including the
+  `certification` block (CSV paths, per-team ticks, and link/match overrides)
 - `event_manager.py` - Main GUI application
-- `RegisteredList.xlsx` - Output from extract_final_registrants.py
-- `Video Demo Checklist.xlsx` - Input file for registrant processing
+- `certification.py` - Certification logic (CSV loading, matching, link safety,
+  participant-row rendering) used by the Certification tab
+- `test_certification.py` - Assertion tests for `certification.py`
+  (run: `uv run python Utils/test_certification.py`)
+- `*Form Responses.csv` - The three Google-Form exports (Registration, Video
+  Submission, Hardware List) consumed by the Certification tab
 
