@@ -199,6 +199,10 @@
             "ucf cavrel blaze racer": {
                 "video_satisfied": true,
                 "hardware_satisfied": true
+            },
+            "upenn autonomous racing": {
+                "video_satisfied": true,
+                "hardware_satisfied": true
             }
         },
         "overrides": {

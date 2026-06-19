@@ -101,6 +101,11 @@ Register the modified information under the same team name, and we will update i
 <td style="text-align: left">University of Central Florida</td>
 <td style="text-align: left">Israel Charles</td>
 </tr>
+<tr>
+<td style="text-align: left">UPenn Autonomous Racing</td>
+<td style="text-align: left">University of Pennsylvania</td>
+<td style="text-align: left">Dhyey Shah</td>
+</tr>
 </tbody>
 </table><!-- /PARTICIPANTS_SECTION -->
 
