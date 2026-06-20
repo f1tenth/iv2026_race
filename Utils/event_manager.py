@@ -135,6 +135,15 @@ def get_default_config() -> dict:
                 "blocked_links": [],
                 "allowed_links": [],
             },
+            "member_overrides": {},
+            "manual_teams": [],
+            "email": {
+                "signature": "RoboRacer Organizing Team",
+                "conference_registration_url": "",
+                "conference_registration_note": "",
+                "confirmation_extra": "",
+                "reminder_extra": "",
+            },
         },
         "organizers": [
             {
@@ -513,7 +522,22 @@ class EventManagerApp:
         self.certification_data = self.config.get(
             "certification", get_default_config()["certification"]
         )
+        # Ensure all sub-keys exist for configs saved by older versions.
+        self.certification_data.setdefault(
+            "csv_paths", {"registration": "", "video": "", "hardware": ""}
+        )
+        self.certification_data.setdefault("ticks", {})
+        self.certification_data.setdefault("member_overrides", {})
+        self.certification_data.setdefault("manual_teams", [])
+        self.certification_data.setdefault("email", {
+            "signature": "RoboRacer Organizing Team",
+            "conference_registration_url": "",
+            "conference_registration_note": "",
+            "confirmation_extra": "",
+            "reminder_extra": "",
+        })
         self.cert_teams: list = []  # last processed Team objects
+        self.cert_registrations: list = []
 
         # Create main notebook (tabs)
         self.notebook = ttk.Notebook(root)
@@ -1661,6 +1685,15 @@ class EventManagerApp:
             command=self.process_certification,
             style="Accent.TButton",
         ).pack(side=tk.LEFT)
+        ttk.Button(
+            action_frame, text="Add Manual Team", command=self.cert_add_manual_team
+        ).pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Button(
+            action_frame, text="Export Emails...", command=self.cert_export_emails
+        ).pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Button(
+            action_frame, text="Email Settings...", command=self.cert_email_settings
+        ).pack(side=tk.LEFT, padx=(8, 0))
         self.cert_status_label = ttk.Label(action_frame, text="Not processed yet.")
         self.cert_status_label.pack(side=tk.LEFT, padx=12)
 
@@ -1718,6 +1751,51 @@ class EventManagerApp:
         self._build_submission_block(detail, cert.FORM_VIDEO, "Video Demo", col=0)
         self._build_submission_block(detail, cert.FORM_HARDWARE, "Hardware List", col=1)
 
+        # Members + email actions (span both columns).
+        extra = ttk.Frame(detail)
+        extra.grid(row=2, column=0, columnspan=2, sticky=tk.EW, pady=(8, 0))
+        extra.columnconfigure(0, weight=1)
+        extra.columnconfigure(1, weight=1)
+
+        members_box = ttk.LabelFrame(extra, text="Team members", padding=6)
+        members_box.grid(row=0, column=0, sticky=tk.NSEW, padx=4)
+        members_box.columnconfigure(0, weight=1)
+        self.cert_members_list = tk.Listbox(
+            members_box, height=5, bg="#2a2a3c", fg="#cdd6f4",
+            selectbackground="#89b4fa", selectforeground="#1e1e2e",
+            relief=tk.FLAT, highlightthickness=1, highlightbackground="#45475a",
+            font=("Ubuntu", 10),
+        )
+        self.cert_members_list.grid(row=0, column=0, sticky=tk.EW)
+        ml_scroll = ttk.Scrollbar(members_box, command=self.cert_members_list.yview)
+        ml_scroll.grid(row=0, column=1, sticky=tk.NS)
+        self.cert_members_list.config(yscrollcommand=ml_scroll.set)
+        m_btns = ttk.Frame(members_box)
+        m_btns.grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=(4, 0))
+        ttk.Button(m_btns, text="Add member", command=self.cert_add_member).pack(side=tk.LEFT)
+        ttk.Button(m_btns, text="Remove member", command=self.cert_remove_member).pack(
+            side=tk.LEFT, padx=(6, 0)
+        )
+
+        email_box = ttk.LabelFrame(extra, text="Registration email to team leader", padding=6)
+        email_box.grid(row=0, column=1, sticky=tk.NSEW, padx=4)
+        email_box.columnconfigure(0, weight=1)
+        self.cert_email_info = ttk.Label(
+            email_box, text="", foreground="#a6adc8", wraplength=380, justify=tk.LEFT
+        )
+        self.cert_email_info.grid(row=0, column=0, sticky=tk.W)
+        e_btns = ttk.Frame(email_box)
+        e_btns.grid(row=1, column=0, sticky=tk.W, pady=(6, 0))
+        self.cert_email_btn = ttk.Button(
+            e_btns, text="Compose Email", command=self.cert_compose_email
+        )
+        self.cert_email_btn.pack(side=tk.LEFT)
+        self.cert_remove_manual_btn = ttk.Button(
+            e_btns, text="Remove Manual Team", command=self.cert_remove_manual_team,
+            state="disabled",
+        )
+        self.cert_remove_manual_btn.pack(side=tk.LEFT, padx=(6, 0))
+
         # --- Not considered list --------------------------------------
         nc_frame = ttk.LabelFrame(
             frame, text="Not considered (missing video or hardware)", padding=4
@@ -1741,6 +1819,9 @@ class EventManagerApp:
         nc_scroll = ttk.Scrollbar(nc_frame, command=self.cert_nc_tree.yview)
         nc_scroll.grid(row=0, column=1, sticky=tk.NS)
         self.cert_nc_tree.config(yscrollcommand=nc_scroll.set)
+        self.cert_nc_tree.bind("<<TreeviewSelect>>", self.on_cert_nc_select)
+
+        self.cert_selected_key: str | None = None
 
         # Auto-process if all three files are available.
         if all(self.cert_path_vars[f].get() for f in self.cert_path_vars):
@@ -1862,6 +1943,8 @@ class EventManagerApp:
                 hardware,
                 overrides=self._cert_overrides,
                 ticks=self.certification_data.get("ticks", {}),
+                member_overrides=self.certification_data.get("member_overrides", {}),
+                manual_teams=self.certification_data.get("manual_teams", []),
             )
         except Exception as e:
             messagebox.showerror("Error", f"Failed to process CSVs: {e}")
@@ -1922,7 +2005,12 @@ class EventManagerApp:
                     ),
                 )
 
-        if prev_key and self.cert_tree.exists(prev_key):
+        key = self.cert_selected_key if hasattr(self, "cert_selected_key") else None
+        if key and self.cert_tree.exists(key):
+            self.cert_tree.selection_set(key)
+        elif key and self.cert_nc_tree.exists(key):
+            self.cert_nc_tree.selection_set(key)
+        elif prev_key and self.cert_tree.exists(prev_key):
             self.cert_tree.selection_set(prev_key)
         else:
             self._clear_detail()
@@ -1940,6 +2028,10 @@ class EventManagerApp:
             self._set_entry(b["url_entry"], "")
             b["badge"].config(text="", bg="#1e1e2e")
             b["satisfied_var"].set(False)
+        if hasattr(self, "cert_members_list"):
+            self.cert_members_list.delete(0, tk.END)
+            self.cert_email_info.config(text="")
+            self.cert_remove_manual_btn.config(state="disabled")
 
     @staticmethod
     def _set_entry(entry: ttk.Entry, text: str) -> None:
@@ -1952,11 +2044,24 @@ class EventManagerApp:
         sel = self.cert_tree.selection()
         if not sel:
             return
-        team = self._team_by_key(sel[0])
+        self.cert_nc_tree.selection_remove(self.cert_nc_tree.selection())
+        self._select_team(sel[0])
+
+    def on_cert_nc_select(self, event=None) -> None:
+        sel = self.cert_nc_tree.selection()
+        if not sel:
+            return
+        self.cert_tree.selection_remove(self.cert_tree.selection())
+        self._select_team(sel[0])
+
+    def _select_team(self, key: str) -> None:
+        team = self._team_by_key(key)
         if not team:
             return
+        self.cert_selected_key = key
+        manual_tag = " [manual]" if team.manual else ""
         self.cert_team_label.config(
-            text=f"{team.display_name}   |   {team.affiliation or 'no affiliation'}   |   "
+            text=f"{team.display_name}{manual_tag}   |   {team.affiliation or 'no affiliation'}   |   "
             f"{'registered' if team.registration_matched else 'NOT MATCHED to a registration'}"
         )
         reg_names = [r.display_name for r in getattr(self, "cert_registrations", [])]
@@ -1980,7 +2085,34 @@ class EventManagerApp:
                 team.video_satisfied if form == cert.FORM_VIDEO else team.hardware_satisfied
             )
             b["satisfied_var"].set(satisfied)
+            # Only allow ticking when there is a submission to check (or manual team).
+            has_sub = bool(ordered)
+            b["satisfied_chk"].config(
+                state=("normal" if (has_sub or team.manual) else "disabled")
+            )
             self._refresh_block_link(form)
+        self._refresh_members(team)
+        self._refresh_email_info(team)
+
+    def _refresh_members(self, team) -> None:
+        self.cert_members_list.delete(0, tk.END)
+        for name, email in team.members:
+            label = name or "(no name)"
+            if email:
+                label += f"  <{email}>"
+            self.cert_members_list.insert(tk.END, label)
+        self.cert_remove_manual_btn.config(
+            state=("normal" if team.manual else "disabled")
+        )
+
+    def _refresh_email_info(self, team) -> None:
+        st = cert.requirement_status(team)
+        kind = "CONFIRMATION" if all(v == cert.REQ_CONFIRMED for v in st.values()) else "REMINDER"
+        to = team.leader_email or "(no leader email on file)"
+        self.cert_email_info.config(
+            text=f"To: {to}\nType: {kind}\n"
+            f"registration={st['registration']}, video={st['video']}, hardware={st['hardware']}"
+        )
 
     def _sub_label(self, sub) -> str:
         ts = sub.timestamp.strftime("%Y-%m-%d %H:%M") if sub.timestamp else "no date"
@@ -2056,11 +2188,11 @@ class EventManagerApp:
         self._cert_overrides["ignored_submissions"].append(sub.submission_id)
         self.process_certification(silent=True)
 
+    def _selected_team(self):
+        return self._team_by_key(self.cert_selected_key) if self.cert_selected_key else None
+
     def cert_toggle_satisfied(self, form: str) -> None:
-        sel = self.cert_tree.selection()
-        if not sel:
-            return
-        team = self._team_by_key(sel[0])
+        team = self._selected_team()
         if not team:
             return
         ticks = self.certification_data.setdefault("ticks", {})
@@ -2075,6 +2207,7 @@ class EventManagerApp:
         else:
             team.hardware_satisfied = val
         self.refresh_cert_trees()
+        self._refresh_email_info(team)
 
     def cert_apply_manual_link(self, form: str) -> None:
         sub = self._selected_sub(form)
@@ -2091,9 +2224,294 @@ class EventManagerApp:
         if not reg:
             return
         self._cert_overrides["submission_links"][sub.submission_id] = reg.team_key
+        self.cert_selected_key = reg.team_key
         self.process_certification(silent=True)
-        if self.cert_tree.exists(reg.team_key):
-            self.cert_tree.selection_set(reg.team_key)
+
+    # ---- Team members --------------------------------------------------
+
+    def cert_add_member(self) -> None:
+        team = self._selected_team()
+        if not team:
+            messagebox.showinfo("Add member", "Select a team first.")
+            return
+        result = self._prompt_form(
+            "Add team member",
+            [("Name", "name", "", False), ("Email", "email", "", False)],
+        )
+        if not result:
+            return
+        name, email = result["name"].strip(), result["email"].strip()
+        if not name and not email:
+            return
+        edits = self.certification_data.setdefault("member_overrides", {})
+        entry = edits.setdefault(team.team_key, {"added": [], "removed": []})
+        entry.setdefault("added", []).append([name, email])
+        # In case this name/email was previously removed, un-remove it.
+        rem = entry.setdefault("removed", [])
+        for tok in (name.lower(), email.lower()):
+            if tok and tok in rem:
+                rem.remove(tok)
+        self.process_certification(silent=True)
+
+    def cert_remove_member(self) -> None:
+        team = self._selected_team()
+        if not team:
+            return
+        sel = self.cert_members_list.curselection()
+        if not sel:
+            messagebox.showinfo("Remove member", "Select a member in the list first.")
+            return
+        idx = sel[0]
+        if idx >= len(team.members):
+            return
+        name, email = team.members[idx]
+        edits = self.certification_data.setdefault("member_overrides", {})
+        entry = edits.setdefault(team.team_key, {"added": [], "removed": []})
+        added = entry.setdefault("added", [])
+        # If this was a manually-added member, just drop it from "added".
+        match_idx = next(
+            (i for i, m in enumerate(added)
+             if (m[0] or "").strip().lower() == name.strip().lower()
+             and (m[1] if len(m) > 1 else "").strip().lower() == (email or "").strip().lower()),
+            None,
+        )
+        if match_idx is not None:
+            added.pop(match_idx)
+        else:
+            token = email.strip().lower() or name.strip().lower()
+            if token:
+                entry.setdefault("removed", []).append(token)
+        self.process_certification(silent=True)
+
+    # ---- Manual teams --------------------------------------------------
+
+    def cert_add_manual_team(self) -> None:
+        result = self._prompt_form(
+            "Add manual team",
+            [
+                ("Team name", "name", "", False),
+                ("Affiliation", "affiliation", "", False),
+                ("Team leader email", "leader_email", "", False),
+                ("Team leader name", "leader_name", "", False),
+                ("Members (Name (email), one per line)", "members", "", True),
+            ],
+        )
+        if not result:
+            return
+        name = result["name"].strip()
+        if not name:
+            messagebox.showwarning("Add manual team", "A team name is required.")
+            return
+        team_key = cert.normalize_team_name(name)
+        members = cert.parse_member_lines(result["members"])
+        # Always include the leader as a member if provided.
+        leader_name = result["leader_name"].strip()
+        leader_email = result["leader_email"].strip()
+        if leader_name or leader_email:
+            members = [(leader_name, leader_email)] + members
+        manual = self.certification_data.setdefault("manual_teams", [])
+        if any(m["team_key"] == team_key for m in manual):
+            messagebox.showwarning(
+                "Add manual team", f"A team with key '{team_key}' already exists."
+            )
+            return
+        manual.append({
+            "team_key": team_key,
+            "display_name": name,
+            "affiliation": result["affiliation"].strip(),
+            "leader_name": leader_name,
+            "leader_email": leader_email,
+            "members": [list(m) for m in members],
+        })
+        # Manual teams default to certified (you are vouching for them).
+        self.certification_data.setdefault("ticks", {})[team_key] = {
+            "video_satisfied": True, "hardware_satisfied": True
+        }
+        self.cert_selected_key = team_key
+        self.process_certification(silent=True)
+
+    def cert_remove_manual_team(self) -> None:
+        team = self._selected_team()
+        if not team or not team.manual:
+            return
+        if not messagebox.askyesno(
+            "Remove manual team", f"Remove manually-added team '{team.display_name}'?"
+        ):
+            return
+        manual = self.certification_data.setdefault("manual_teams", [])
+        self.certification_data["manual_teams"] = [
+            m for m in manual if m["team_key"] != team.team_key
+        ]
+        self.certification_data.get("ticks", {}).pop(team.team_key, None)
+        self.certification_data.get("member_overrides", {}).pop(team.team_key, None)
+        self.cert_selected_key = None
+        self.process_certification(silent=True)
+
+    # ---- Emails --------------------------------------------------------
+
+    def _email_context(self) -> dict:
+        """Assemble the email template context from config + email settings."""
+        cfg = self.collect_config()
+        ev = cfg.get("event", {})
+        reg = cfg.get("registration", {})
+        em = self.certification_data.get("email", {})
+        acronym = ev.get("conference_name", "").strip()
+        year = ev.get("year", "").strip()
+        conf_label = " ".join(p for p in (acronym, year) if p)
+        event_name = " ".join(p for p in ("Roboracer", acronym, year) if p) or "Roboracer"
+        competition = (f"{conf_label} RoboRacer Competition").strip() or "RoboRacer Competition"
+        return {
+            "event_name": event_name,
+            "competition_name": competition,
+            "conf_label": conf_label or "conference",
+            "contact_email": ev.get("contact_email", ""),
+            "signature": em.get("signature", "RoboRacer Organizing Team"),
+            "conf_reg_url": em.get("conference_registration_url", ""),
+            "conf_reg_note": em.get("conference_registration_note", ""),
+            "confirmation_extra": em.get("confirmation_extra", ""),
+            "reminder_extra": em.get("reminder_extra", ""),
+            "video_form": reg.get("video_demo_form_link", ""),
+            "hardware_form": reg.get("hardware_list_form_link", ""),
+            "reg_form": reg.get("form_link", ""),
+        }
+
+    def cert_email_settings(self) -> None:
+        """Edit the email template settings (signature, conf-reg link, extras)."""
+        em = self.certification_data.setdefault("email", {})
+        result = self._prompt_form(
+            "Email settings",
+            [
+                ("Signature", "signature",
+                 em.get("signature", "RoboRacer Organizing Team"), False),
+                ("Conference registration URL", "conference_registration_url",
+                 em.get("conference_registration_url", ""), False),
+                ("Conference registration note (e.g. dedicated category text)",
+                 "conference_registration_note",
+                 em.get("conference_registration_note", ""), True),
+                ("Confirmation email extra (prize pool, stipend, ...)",
+                 "confirmation_extra", em.get("confirmation_extra", ""), True),
+                ("Reminder email extra", "reminder_extra",
+                 em.get("reminder_extra", ""), True),
+            ],
+        )
+        if not result:
+            return
+        for key in (
+            "signature", "conference_registration_url",
+            "conference_registration_note", "confirmation_extra", "reminder_extra",
+        ):
+            em[key] = result[key]
+        messagebox.showinfo("Email settings", "Email settings updated (remember to Save).")
+
+    def cert_compose_email(self) -> None:
+        team = self._selected_team()
+        if not team:
+            messagebox.showinfo("Compose email", "Select a team first.")
+            return
+        if not team.leader_email:
+            messagebox.showwarning(
+                "Compose email",
+                "This team has no team-leader email on file (it isn't matched to a "
+                "registration). Add a manual team or link it to a registration first.",
+            )
+            return
+        ctx = self._email_context()
+        email = cert.build_email(team, ctx)
+        preview = (
+            f"To: {email['to']}\nSubject: {email['subject']}\n\n{email['body']}\n\n"
+            f"Open this in your email client now?"
+        )
+        if messagebox.askyesno(f"Send {email['kind']} email?", preview):
+            webbrowser.open(
+                cert.mailto_url(email["to"], email["subject"], email["body"])
+            )
+
+    def cert_export_emails(self) -> None:
+        if not self.cert_teams:
+            messagebox.showinfo("Export emails", "Process the CSVs first.")
+            return
+        targets = [
+            t for t in self.cert_teams if t.registration_matched and t.leader_email
+        ]
+        if not targets:
+            messagebox.showinfo("Export emails", "No teams with a leader email to write.")
+            return
+        directory = filedialog.askdirectory(
+            title="Choose a folder to write .eml files into", initialdir=SCRIPT_DIR
+        )
+        if not directory:
+            return
+        ctx = self._email_context()
+        sender = ctx["contact_email"] or "roboracer@example.com"
+        n_confirm = n_remind = 0
+        for team in targets:
+            email = cert.build_email(team, ctx)
+            safe = re.sub(r"[^a-z0-9]+", "_", team.team_key).strip("_") or "team"
+            fname = f"{email['kind']}_{safe}.eml"
+            with open(Path(directory) / fname, "w", encoding="utf-8") as f:
+                f.write(cert.to_eml(email, sender))
+            if email["kind"] == "confirm":
+                n_confirm += 1
+            else:
+                n_remind += 1
+        messagebox.showinfo(
+            "Export emails",
+            f"Wrote {len(targets)} .eml files to:\n{directory}\n\n"
+            f"  {n_confirm} confirmation(s), {n_remind} reminder(s).\n\n"
+            "Open them in your mail client to review and send.",
+        )
+
+    # ---- Generic modal form dialog ------------------------------------
+
+    def _prompt_form(self, title: str, fields: list[tuple]) -> dict | None:
+        """Show a modal form. fields: list of (label, key, default, multiline)."""
+        dialog = tk.Toplevel(self.root)
+        dialog.title(title)
+        dialog.configure(bg="#1e1e2e")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        dialog.columnconfigure(1, weight=1)
+
+        widgets: dict[str, tk.Widget] = {}
+        for i, (label, key, default, multiline) in enumerate(fields):
+            ttk.Label(dialog, text=label + ":").grid(
+                row=i, column=0, sticky=tk.NW, padx=8, pady=6
+            )
+            if multiline:
+                w = tk.Text(dialog, width=44, height=5, bg="#2a2a3c", fg="#cdd6f4",
+                            insertbackground="#cdd6f4", relief=tk.FLAT,
+                            highlightthickness=1, highlightbackground="#45475a",
+                            font=("Ubuntu", 10))
+                w.insert("1.0", default)
+            else:
+                w = tk.Entry(dialog, width=44, bg="#2a2a3c", fg="#cdd6f4",
+                             insertbackground="#cdd6f4", relief=tk.FLAT,
+                             highlightthickness=1, highlightbackground="#45475a",
+                             font=("Ubuntu", 10))
+                w.insert(0, default)
+            w.grid(row=i, column=1, sticky=tk.EW, padx=8, pady=6)
+            widgets[key] = (w, multiline)
+
+        result: dict = {}
+
+        def on_ok():
+            for k, (w, ml) in widgets.items():
+                result[k] = w.get("1.0", tk.END).rstrip("\n") if ml else w.get()
+            result["_ok"] = True
+            dialog.destroy()
+
+        def on_cancel():
+            dialog.destroy()
+
+        btns = ttk.Frame(dialog)
+        btns.grid(row=len(fields), column=0, columnspan=2, pady=10)
+        ttk.Button(btns, text="OK", command=on_ok, style="Accent.TButton").pack(
+            side=tk.LEFT, padx=4
+        )
+        ttk.Button(btns, text="Cancel", command=on_cancel).pack(side=tk.LEFT, padx=4)
+
+        self.root.wait_window(dialog)
+        return result if result.get("_ok") else None
 
     def create_resources_tab(self) -> None:
         """Create the Resources tab for adding custom Markdown to race_resources.md."""
@@ -3076,18 +3494,23 @@ class RepositoryUpdater:
         reg_p = paths.get("registration", "")
         vid_p = paths.get("video", "")
         hw_p = paths.get("hardware", "")
-        if not (reg_p and vid_p and hw_p):
-            return ""
-        if not (Path(reg_p).exists() and Path(vid_p).exists() and Path(hw_p).exists()):
+        manual_teams = certc.get("manual_teams", [])
+        have_csvs = all(
+            p and Path(p).exists() for p in (reg_p, vid_p, hw_p)
+        )
+        # Nothing to render if there are neither CSVs nor manual teams.
+        if not have_csvs and not manual_teams:
             return ""
         try:
-            regs = cert.load_registrations(reg_p)
-            videos = cert.load_video_submissions(vid_p)
-            hardware = cert.load_hardware_submissions(hw_p)
+            regs = cert.load_registrations(reg_p) if have_csvs else []
+            videos = cert.load_video_submissions(vid_p) if have_csvs else []
+            hardware = cert.load_hardware_submissions(hw_p) if have_csvs else []
             teams = cert.build_teams(
                 regs, videos, hardware,
                 overrides=certc.get("overrides", {}),
                 ticks=certc.get("ticks", {}),
+                member_overrides=certc.get("member_overrides", {}),
+                manual_teams=certc.get("manual_teams", []),
             )
             return cert.render_participant_rows(teams)
         except Exception:

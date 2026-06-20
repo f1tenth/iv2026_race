@@ -62,9 +62,29 @@ uv run python Utils/event_manager.py
    - Tick **Video satisfied** and **Hardware satisfied** individually; once both are
      ticked *and* the team is matched to a registration it becomes **certified**
    - Use **Manually link this submission to registration** to fix mismatches
-   - Re-run any time after new responses arrive — your ticks and overrides persist
-   - On **Apply to Repository**, certified teams populate the Participants table on
-     the registration page
+   - **Team members**: add or remove members on the selected team (Add/Remove
+     member). Edits are stored as deltas and survive reprocessing
+   - **Add Manual Team**: register a team by hand (name, affiliation, leader,
+     members). Manual teams count as registered and are certified by default, so
+     they appear in the participants list even without form submissions; select
+     one to **Remove Manual Team**
+   - **Emails to team leaders** (no external API):
+     - **Compose Email** opens your mail client (via `mailto:`) pre-filled to the
+       team leader — a *confirmation* if all three requirements are met, otherwise
+       a *reminder* that names exactly which requirement(s) are still outstanding.
+       Subjects are templated (e.g. `Roboracer IV 2026 Registration - Confirmation`)
+     - Every email includes the standing reminder that team members must also
+       register for the conference itself to access the venue
+     - **Export Emails...** writes one `.eml` file per registered team into a folder
+       you choose (confirmations + reminders) for you to review and send in bulk
+     - **Email Settings...** configures the signature, the conference-registration
+       URL and note (e.g. the dedicated competition category), and optional extra
+       paragraphs appended to confirmation/reminder emails (prize pool, travel
+       stipend, and other competition-specific details)
+   - Re-run any time after new responses arrive — your ticks, overrides, member
+     edits, and manual teams all persist
+   - On **Apply to Repository**, certified teams (including manual ones) populate
+     the Participants table on the registration page
 
 ### Configuration File
 

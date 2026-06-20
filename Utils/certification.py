@@ -155,6 +155,31 @@ def parse_members(text: str) -> list[tuple[str, str]]:
     return [("", e) for e in split_emails(raw)]
 
 
+def parse_member_lines(text: str) -> list[tuple[str, str]]:
+    """Parse one-member-per-line text into ``(name, email)`` tuples.
+
+    Each non-empty line yields one member: an email is extracted if present
+    (inside parens or bare), and whatever remains is the name. Unlike
+    :func:`parse_members`, a line with just a name (no email) is kept.
+    """
+    if not text:
+        return []
+    members: list[tuple[str, str]] = []
+    for line in str(text).splitlines():
+        line = line.strip().strip(",")
+        if not line:
+            continue
+        emails = re.findall(r"[^\s,;()<>]+@[^\s,;()<>]+", line)
+        email = normalize_email(emails[0]) if emails else ""
+        name = line
+        if email:
+            name = re.sub(r"[<(]?\s*" + re.escape(emails[0]) + r"\s*[>)]?", "", name)
+        name = re.sub(r"\s+", " ", name).strip(" ,()<>")
+        if name or email:
+            members.append((name, email))
+    return members
+
+
 def parse_links(cell: str) -> list[str]:
     """Return all http(s) URLs found in a cell (a cell may hold several)."""
     if cell is None:
@@ -311,10 +336,19 @@ class Team:
     latest_hardware: Submission | None = None
     video_satisfied: bool = False
     hardware_satisfied: bool = False
+    manual: bool = False  # added by hand rather than from a CSV
 
     @property
     def registration_matched(self) -> bool:
         return self.registration is not None
+
+    @property
+    def leader_email(self) -> str:
+        return self.registration.submitter_email if self.registration else ""
+
+    @property
+    def leader_name(self) -> str:
+        return self.registration.submitter_name if self.registration else ""
 
     @property
     def has_video(self) -> bool:
@@ -326,8 +360,8 @@ class Team:
 
     @property
     def is_candidate(self) -> bool:
-        """Considered only if both a video AND a hardware submission exist."""
-        return self.has_video and self.has_hardware
+        """Considered if added manually or it has both a video AND hardware submission."""
+        return self.manual or (self.has_video and self.has_hardware)
 
     @property
     def certified(self) -> bool:
@@ -486,12 +520,28 @@ def _latest(subs: list[Submission]) -> Submission | None:
     return max(subs, key=lambda s: (s.timestamp or datetime.min))
 
 
+def manual_team_to_registration(entry: dict) -> Registration:
+    """Build a synthetic Registration from a manually-added team dict."""
+    members = [tuple(m) for m in entry.get("members", [])]
+    return Registration(
+        team_key=entry["team_key"],
+        display_name=entry.get("display_name", entry["team_key"]),
+        affiliation=entry.get("affiliation", ""),
+        submitter_name=entry.get("leader_name", ""),
+        submitter_email=entry.get("leader_email", ""),
+        members=members,
+        timestamp=None,
+    )
+
+
 def build_teams(
     regs: list[Registration],
     videos: list[Submission],
     hardware: list[Submission],
     overrides: dict | None = None,
     ticks: dict | None = None,
+    member_overrides: dict | None = None,
+    manual_teams: list[dict] | None = None,
 ) -> list[Team]:
     """Aggregate registrations + submissions into Team objects.
 
@@ -499,9 +549,14 @@ def build_teams(
       - ``submission_links``: {submission_id: team_key}  (manual re-link)
       - ``ignored_submissions``: [submission_id, ...]    (drop as redundant)
     ``ticks`` maps team_key -> {"video_satisfied": bool, "hardware_satisfied": bool}.
+    ``member_overrides`` maps team_key -> {"added": [[name, email], ...],
+      "removed": [name-or-email-token, ...]} (applied after assembly).
+    ``manual_teams`` is a list of hand-added team dicts (treated as registered).
     """
     overrides = overrides or {}
     ticks = ticks or {}
+    member_overrides = member_overrides or {}
+    manual_teams = manual_teams or []
     submission_links = overrides.get("submission_links", {})
     ignored = set(overrides.get("ignored_submissions", []))
 
@@ -514,24 +569,36 @@ def build_teams(
         ):
             reg_by_key[reg.team_key] = reg
 
+    # Manual teams act as registrations (overriding any CSV row with the same key).
+    manual_keys: set[str] = set()
+    for entry in manual_teams:
+        reg_by_key[entry["team_key"]] = manual_team_to_registration(entry)
+        manual_keys.add(entry["team_key"])
+
     teams: dict[str, Team] = {}
 
     def ensure_team(team_key: str) -> Team:
         if team_key not in teams:
             reg = reg_by_key.get(team_key)
-            t = ticks.get(team_key, {})
+            is_manual = team_key in manual_keys
+            # Manual teams default to satisfied so they appear as certified.
+            t = ticks.get(
+                team_key,
+                {"video_satisfied": is_manual, "hardware_satisfied": is_manual},
+            )
             teams[team_key] = Team(
                 team_key=team_key,
                 display_name=reg.display_name if reg else team_key,
                 affiliation=reg.affiliation if reg else "",
                 registration=reg,
-                members=reg.members if reg else [],
+                members=list(reg.members) if reg else [],
                 video_satisfied=bool(t.get("video_satisfied", False)),
                 hardware_satisfied=bool(t.get("hardware_satisfied", False)),
+                manual=is_manual,
             )
         return teams[team_key]
 
-    # Make sure every registration produces a team even with no submissions.
+    # Make sure every registration (incl. manual) produces a team.
     for key in reg_by_key:
         ensure_team(key)
 
@@ -562,8 +629,32 @@ def build_teams(
             src = team.latest_video or team.latest_hardware
             if src:
                 team.display_name = src.team_name
+        # Apply manual member add/remove edits.
+        edit = member_overrides.get(team.team_key)
+        if edit:
+            team.members = _apply_member_edits(team.members, edit)
 
     return sorted(teams.values(), key=lambda t: t.display_name.lower())
+
+
+def _apply_member_edits(
+    members: list[tuple[str, str]], edit: dict
+) -> list[tuple[str, str]]:
+    """Apply ``{"added": [...], "removed": [...]}`` deltas to a member list.
+
+    Removal tokens match a member by (case-insensitive) name or email.
+    """
+    removed = {str(t).strip().lower() for t in edit.get("removed", []) if str(t).strip()}
+    result: list[tuple[str, str]] = []
+    for name, email in members:
+        if name.strip().lower() in removed or (email or "").strip().lower() in removed:
+            continue
+        result.append((name, email))
+    for m in edit.get("added", []):
+        name = m[0] if len(m) > 0 else ""
+        email = m[1] if len(m) > 1 else ""
+        result.append((name, email))
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -599,3 +690,164 @@ def render_participant_rows(teams: list[Team]) -> str:
             "</tr>"
         )
     return "\n".join(rows)
+
+
+# ---------------------------------------------------------------------------
+# Registration emails (no external API: produces mailto/.eml content)
+# ---------------------------------------------------------------------------
+
+REQ_CONFIRMED = "confirmed"
+REQ_PENDING = "pending"
+REQ_MISSING = "missing"
+
+
+def requirement_status(team: Team) -> dict[str, str]:
+    """Per-requirement status for a team: confirmed / pending / missing."""
+    return {
+        "registration": REQ_CONFIRMED if team.registration_matched else REQ_MISSING,
+        "video": (
+            REQ_CONFIRMED if team.video_satisfied
+            else REQ_PENDING if team.has_video
+            else REQ_MISSING
+        ),
+        "hardware": (
+            REQ_CONFIRMED if team.hardware_satisfied
+            else REQ_PENDING if team.has_hardware
+            else REQ_MISSING
+        ),
+    }
+
+
+def _first_name(full: str) -> str:
+    full = (full or "").strip()
+    return full.split()[0] if full else "Team Lead"
+
+
+def _conference_registration_paragraph(ctx: dict) -> str:
+    """The 'you still must register for the conference itself' paragraph.
+
+    Always included (true for any competition). Appends a configurable note
+    and/or the conference registration URL when provided.
+    """
+    label = ctx.get("conf_label") or "conference"
+    para = (
+        f"Please also note that team members are still required to register for "
+        f"the {label} conference itself to be granted access to the venue."
+    )
+    note = (ctx.get("conf_reg_note") or "").strip()
+    url = (ctx.get("conf_reg_url") or "").strip()
+    if note and url:
+        para += f" {note.rstrip()} {url}"
+    elif url:
+        para += f" You can register here: {url}"
+    elif note:
+        para += f" {note}"
+    return para
+
+
+def build_email(team: Team, ctx: dict) -> dict:
+    """Build a confirmation or reminder email for a team leader.
+
+    ``ctx`` keys (all optional except where noted): ``event_name`` (subject
+    prefix, e.g. "Roboracer IV 2026"), ``competition_name`` (e.g. "IV 2026
+    RoboRacer Competition"), ``conf_label`` (e.g. "IV 2026"), ``contact_email``,
+    ``signature``, ``conf_reg_url``, ``conf_reg_note``, ``video_form``,
+    ``hardware_form``, ``reg_form``, ``confirmation_extra``, ``reminder_extra``.
+
+    Returns ``{to, subject, body, kind, status}``. ``kind`` is ``confirm`` when
+    all three requirements are confirmed, otherwise ``remind``.
+    """
+    status = requirement_status(team)
+    first = _first_name(team.leader_name)
+    team_name = team.display_name
+    event_name = ctx.get("event_name") or "Roboracer"
+    competition = ctx.get("competition_name") or "RoboRacer Competition"
+    contact = (ctx.get("contact_email") or "").strip()
+    signature = ctx.get("signature") or "RoboRacer Organizing Team"
+    all_ok = all(v == REQ_CONFIRMED for v in status.values())
+    kind = "confirm" if all_ok else "remind"
+    conf_para = _conference_registration_paragraph(ctx)
+
+    if kind == "confirm":
+        subject = f"{event_name} Registration - Confirmation"
+        parts = [
+            f"Dear {first},",
+            "",
+            f"You are receiving this email as you submitted the video demo and "
+            f"hardware list for team \"{team_name}\". We are happy to confirm that "
+            f"your submissions meet the competition requirements and that your team "
+            f"is now officially registered for the {competition}.",
+            "",
+            conf_para,
+        ]
+        extra = (ctx.get("confirmation_extra") or "").strip()
+        if extra:
+            parts += ["", extra]
+        parts += ["", "Best regards,", signature]
+        body = "\n".join(parts)
+    else:
+        labels = {
+            "registration": ("Team registration", ctx.get("reg_form", "")),
+            "video": ("Video demonstration", ctx.get("video_form", "")),
+            "hardware": ("Hardware list", ctx.get("hardware_form", "")),
+        }
+        lines = []
+        for key in ("registration", "video", "hardware"):
+            label, form = labels[key]
+            st = status[key]
+            if st == REQ_CONFIRMED:
+                continue  # only enumerate outstanding items
+            if st == REQ_PENDING:
+                lines.append(
+                    f"  - {label}: received and currently under review "
+                    f"(no action needed on your part)"
+                )
+            else:
+                action = (
+                    f" - please submit it here: {form}"
+                    if form
+                    else " - please submit it as soon as possible"
+                )
+                lines.append(f"  - {label}: not yet received{action}")
+
+        subject = f"{event_name} Registration - Reminder"
+        parts = [
+            f"Dear {first},",
+            "",
+            f"You are receiving this email regarding the registration status of "
+            f"team \"{team_name}\" for the {competition}. The following still "
+            f"needs attention before your registration can be confirmed:",
+            "",
+            "\n".join(lines),
+            "",
+            "Please address the item(s) above as soon as possible.",
+            "",
+            conf_para,
+        ]
+        extra = (ctx.get("reminder_extra") or "").strip()
+        if extra:
+            parts += ["", extra]
+        if contact:
+            parts += ["", f"If you have any questions, please contact us at {contact}."]
+        parts += ["", "Best regards,", signature]
+        body = "\n".join(parts)
+
+    return {"to": team.leader_email, "subject": subject, "body": body,
+            "kind": kind, "status": status}
+
+
+def mailto_url(to: str, subject: str, body: str) -> str:
+    """Build a mailto: URL that opens the user's mail client pre-filled."""
+    from urllib.parse import quote
+    return f"mailto:{to}?subject={quote(subject)}&body={quote(body)}"
+
+
+def to_eml(email: dict, sender: str) -> str:
+    """Serialize an email dict to RFC-822 .eml text."""
+    from email.message import EmailMessage
+    msg = EmailMessage()
+    msg["From"] = sender
+    msg["To"] = email["to"]
+    msg["Subject"] = email["subject"]
+    msg.set_content(email["body"])
+    return msg.as_string()
