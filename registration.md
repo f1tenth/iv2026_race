@@ -54,7 +54,7 @@ Register the modified information under the same team name, and we will update i
 <tr>
 <td style="text-align: left">AIR UOP</td>
 <td style="text-align: left">University of the Pacifc</td>
-<td style="text-align: left">Patrick Bartholomy<br>Michael Alam<br>Usair Naseer<br>Toan Nguyen</td>
+<td style="text-align: left">Patrick Bartholomy<br>Michael Alam<br>Usair Naseer</td>
 </tr>
 <tr>
 <td style="text-align: left">Boiler Autonomy</td>
@@ -94,7 +94,7 @@ Register the modified information under the same team name, and we will update i
 <tr>
 <td style="text-align: left">Thunderbolt UPenn</td>
 <td style="text-align: left">University Of Pennsylvania</td>
-<td style="text-align: left">Cedric Hollande<br>Dhyey Shah</td>
+<td style="text-align: left">Cedric Hollande</td>
 </tr>
 <tr>
 <td style="text-align: left">UCF-CAVREL BLAZE RACER</td>
@@ -105,6 +105,11 @@ Register the modified information under the same team name, and we will update i
 <td style="text-align: left">UPenn Autonomous Racing</td>
 <td style="text-align: left">University of Pennsylvania</td>
 <td style="text-align: left">Dhyey Shah</td>
+</tr>
+<tr>
+<td style="text-align: left">WVU Mountaineer</td>
+<td style="text-align: left">West Virginia University</td>
+<td style="text-align: left">Andrew Sarver<br>Evan Anderson</td>
 </tr>
 </tbody>
 </table><!-- /PARTICIPANTS_SECTION -->
