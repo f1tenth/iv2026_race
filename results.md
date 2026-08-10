@@ -28,43 +28,10 @@ section: stream
 
 <!-- RESULTS_PLACEHOLDER --><p style="color: #888; font-style: italic;">Results will be posted after the competition.</p><!-- /RESULTS_PLACEHOLDER -->
 
-<!-- <h3 style="text-align: left;">CEREMONY</h3>
-    <table>
-	    <tr>
-		    <th>Ranking</th>
-		    <th>AWARD</th>
-		    <th>TEAM</th>
-	    </tr>
-	    <tr>
-		    <td>1st Place Prize</td>
-		    <td>IEEE ICRA2025</td>
-		    <td>IDEA_LAB</td>
-	    </tr>
-	    <tr>
-		    <td>2st Place Prize</td>
-		    <td>IEEE ICRA2025</td>
-		    <td>Tayo Eagles</td>
-	    </tr>
-	    <tr>
-		    <td>3st Place Prize</td>
-		    <td>IEEE ICRA2025</td>
-		    <td>F1T_Lab</td>
-	    </tr>
-	    <tr>
-		    <td>4st Place Prize</td>
-		    <td>IEEE ICRA2025</td>
-		    <td>DDRX</td>
-	    </tr>
-    </table> -->
-
 <!-- TIME_TRIAL_SECTION --><!-- /TIME_TRIAL_SECTION -->
 
 <!-- BRACKET_SECTION --><!-- /BRACKET_SECTION -->
 
-</center>
+<!-- BRACKET_EMBED --><iframe src="https://challonge.com/y6a9s1vl/module" width="100%" height="500" frameborder="0" scrolling="auto" allowtransparency="true"></iframe><!-- /BRACKET_EMBED -->
 
-<!--
-<center>
-<iframe src="https://challonge.com/jf88sqbk/module" width="100%" height="500" frameborder="0" scrolling="auto" allowtransparency="true"></iframe>
 </center>
--->

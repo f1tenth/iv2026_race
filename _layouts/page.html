@@ -8,7 +8,7 @@
 <html>
 
 <head>
-	<title>Roboracer ICRA 2026 | {{ page.short_title | default: page.title | escape }}</title>
+	<!-- LAYOUT_PAGE_TITLE --><title>Roboracer IV 2026 | {{ page.short_title | default: page.title | escape }}</title><!-- /LAYOUT_PAGE_TITLE -->
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 	<link rel="stylesheet" href="{% link assets/css/main.css %}" />
@@ -36,6 +36,9 @@
 				<li {%if page.section=="timeline" %}class="active" {%endif%}>
                     <a href="{% link timeline.md %}">Timeline</a>
                 </li>
+				<li {%if page.section=="schedule" %}class="active" {%endif%}>
+                    <a href="{% link race_schedule.md %}">Schedule</a>
+                </li>
 				<li {%if page.section=="race" %}class="active" {%endif%}>
                     <a href="{% link race_resources.md %}">Race Resources</a>
                 </li>
@@ -60,11 +63,8 @@
                         <span class="label">Website</span>
                     </a>
                 </li>
-                <!-- NAV_EMAIL_LINK --><li>
-                    <a href="mailto:contact@roboracer.ai" class="icon solid solo fa-envelope">
-                        <span class="label">Email</span>
-                    </a>
-                </li><!-- /NAV_EMAIL_LINK -->
+                <!-- NAV_EMAIL_LINK --><li><a href="mailto:contact@roboracer.ai" class="icon solid solo fa-envelope"><span
+						class="label">Email</span></a></li><!-- /NAV_EMAIL_LINK -->
                 <li>
                     <a href="https://join.slack.com/t/robo-racer/shared_invite/zt-2sfu4qr7p-3oe27mCnH98muwRR9uEAbg" class="icon brands alt fa-slack">
                         <span class="label">Slack</span>

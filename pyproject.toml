@@ -1,5 +1,5 @@
 [project]
-name = "icra2026-race"
+name = "iv2026-race"
 version = "0.1.0"
 description = "Roboracer Race Event Management - Tools for managing autonomous racing competition websites"
 readme = "README.md"
@@ -15,3 +15,10 @@ dependencies = [
 
 [project.scripts]
 event-manager = "Utils.event_manager:main"
+
+[tool.uv]
+# Use the system Python (Arch's python + tk) rather than uv's standalone build:
+# the standalone Tk has no Xft support and only exposes the bitmap "fixed" font,
+# which renders the GUI tiny and unscalable. The system Tk sees all installed
+# fonts (Ubuntu, DejaVu, ...) so the Event Manager renders correctly.
+python-preference = "only-system"
