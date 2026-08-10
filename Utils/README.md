@@ -13,6 +13,29 @@ The **Event Manager** is a GUI-based tool that allows organizers to easily confi
 uv run python Utils/event_manager.py
 ```
 
+#### Fonts (important on Linux)
+
+The project is pinned to the **system Python** (`[tool.uv] python-preference =
+"only-system"`) because uv's standalone Python ships a Tk built **without Xft** —
+it can only see the bitmap `fixed` font, which makes the whole GUI tiny and
+impossible to scale. The system Python (Arch: `python` + `tk`) links an Xft-enabled
+Tk that sees all installed fonts. If you ever see a one-font/tiny UI, check
+`uv run python -c "import tkinter,tkinter.font as f; r=tkinter.Tk(); print(len(f.families(r)))"`
+— it should report hundreds, not 1.
+
+#### HiDPI / 4K displays
+
+The UI auto-detects screen DPI, but X11/Arch often reports 96 DPI even on 4K
+screens (making the UI tiny). Override the scale factor either way:
+
+```bash
+# One-off (e.g. 2x):
+EVENT_MANAGER_UI_SCALE=2 uv run python Utils/event_manager.py
+```
+
+Or set it permanently in `Utils/event_config.json`: `"ui_scale": 2.0`
+(`null` = auto-detect). The value is clamped to 1.0–3.0 and applied on launch.
+
 ### Features
 
 1. **Event Details Tab** - Configure:
@@ -86,6 +109,25 @@ uv run python Utils/event_manager.py
    - On **Apply to Repository**, certified teams (including manual ones) populate
      the Participants table on the registration page
 
+7. **Schedule Tab** - Build the group-based, bookable competition schedule:
+   - **Practice groups**: set *teams per group* and **Auto-assign** to partition
+     your certified teams into Group 1/2/3…, with a per-team dropdown to override.
+     Group rosters render at the top of the Schedule page. Shared/open practice is
+     a group activity; **regulated practice is open booking** (per-team slots).
+   - **Import days from timeline**: exports a starter schedule CSV pre-filled with
+     your enabled competition-day dates (from the Dates & Competition Days tabs) so
+     you don't retype them — open it in Google Sheets and add session rows.
+   - **Generate booking grid...**: pick a session, date (dropdown of timeline days),
+     window and slot length → writes a CSV of empty per-team slots to paste into
+     Sheets; teams fill the `Team` column first-come-first-served, then you re-import.
+   - **Schedule sheet (CSV)**: the timetable you maintain in Sheets, with columns
+     `Date, Start, End, Session, Group, Team, Notes`. A row with `Team` filled is a
+     booked slot (rendered as a booking table); a row without is a shared/timetable
+     block. Blank `Date` inherits the day above; blank Start/End = "All day".
+   - **Generate Preview** renders the rosters + day-by-day timetable; on **Apply to
+     Repository** it publishes to the **Schedule** page (`race_schedule.md`, linked
+     in the site nav).
+
 ### Configuration File
 
 All settings are stored in `Utils/event_config.json`. This file can be:
@@ -127,8 +169,10 @@ Adjust these offsets in the Dates & Timeline tab as needed.
 - `event_manager.py` - Main GUI application
 - `certification.py` - Certification logic (CSV loading, matching, link safety,
   participant-row rendering) used by the Certification tab
-- `test_certification.py` - Assertion tests for `certification.py`
-  (run: `uv run python Utils/test_certification.py`)
+- `schedule.py` - Schedule logic (CSV parsing, group rosters, timetable/booking
+  rendering, slot-grid generation) used by the Schedule tab
+- `test_certification.py` / `test_schedule.py` - Assertion tests
+  (run: `uv run python Utils/test_certification.py` / `... test_schedule.py`)
 - `*Form Responses.csv` - The three Google-Form exports (Registration, Video
   Submission, Hardware List) consumed by the Certification tab
 

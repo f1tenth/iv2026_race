@@ -1,0 +1,4 @@
+# Files rewritten by Utils/event_manager.py are always written back with LF
+# (RepositoryUpdater opens them with newline=None). Pin them to LF so an Apply
+# never shows up as a whole-file CRLF->LF rewrite.
+_layouts/*.html text eol=lf
