@@ -211,6 +211,23 @@
             "ignored_submissions": [],
             "blocked_links": [],
             "allowed_links": []
+        },
+        "member_overrides": {},
+        "manual_teams": [],
+        "email": {
+            "signature": "RoboRacer Organizing Team",
+            "conference_registration_url": "",
+            "conference_registration_note": "",
+            "confirmation_extra": "",
+            "reminder_extra": ""
         }
-    }
+    },
+    "schedule": {
+        "timezone_label": "ET",
+        "csv_path": "",
+        "group_size": 4,
+        "groups": {},
+        "days": []
+    },
+    "ui_scale": null
 }

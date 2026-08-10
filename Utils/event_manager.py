@@ -20,7 +20,7 @@ import tkinter as tk
 import webbrowser
 from datetime import datetime, timedelta
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, font as tkfont, messagebox, ttk
 from typing import Any
 
 import cairosvg
@@ -29,6 +29,7 @@ from tkcalendar import Calendar
 from ttkthemes import ThemedTk
 
 import certification as cert
+import schedule as sched
 
 # Get the directory where this script is located
 SCRIPT_DIR = Path(__file__).parent
@@ -48,6 +49,15 @@ def save_config(config: dict) -> None:
     """Save event configuration to JSON file."""
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4)
+
+
+def _is_int(value: str) -> bool:
+    """True if the string is a (possibly negative) integer token."""
+    try:
+        int(value)
+        return True
+    except (TypeError, ValueError):
+        return False
 
 
 def get_default_config() -> dict:
@@ -111,6 +121,7 @@ def get_default_config() -> dict:
         "results": {
             "time_trial_sheet_link": "",
             "bracket_link": "",
+            "bracket_embed_url": "",
             "twitch_parent_domains": ["localhost"],
             "youtube_stream_id": "",
             "show_stream_placeholder": True,
@@ -144,6 +155,13 @@ def get_default_config() -> dict:
                 "confirmation_extra": "",
                 "reminder_extra": "",
             },
+        },
+        "schedule": {
+            "timezone_label": "ET",
+            "csv_path": "",
+            "group_size": 4,
+            "groups": {},
+            "days": [],
         },
         "organizers": [
             {
@@ -509,14 +527,16 @@ class EventManagerApp:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("Roboracer Event Manager")
-        self.root.geometry("1000x850")
-        self.root.minsize(900, 750)
+
+        # Load configuration (needed before styling for the UI scale).
+        self.config = load_config()
+
+        # Resolve and apply HiDPI scaling before any widgets/styles are created.
+        self.ui_scale = self._resolve_ui_scale()
+        self._apply_ui_scaling()
 
         # Configure custom styles
         self.setup_styles()
-
-        # Load configuration
-        self.config = load_config()
 
         # Certification state (persisted under config["certification"]).
         self.certification_data = self.config.get(
@@ -539,9 +559,19 @@ class EventManagerApp:
         self.cert_teams: list = []  # last processed Team objects
         self.cert_registrations: list = []
 
-        # Create main notebook (tabs)
+        # Schedule state (persisted under config["schedule"]).
+        self.schedule_data = self.config.get(
+            "schedule", get_default_config()["schedule"]
+        )
+        self.schedule_data.setdefault("timezone_label", "ET")
+        self.schedule_data.setdefault("csv_path", "")
+        self.schedule_data.setdefault("group_size", 4)
+        self.schedule_data.setdefault("groups", {})
+        self.schedule_data.setdefault("days", [])
+
+        # Create main notebook (tabs). Packed last so the bottom button row
+        # (packed to side=BOTTOM first) always keeps its space.
         self.notebook = ttk.Notebook(root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Create tabs
         self.create_event_tab()
@@ -552,13 +582,161 @@ class EventManagerApp:
         self.create_results_tab()
         self.create_organizers_tab()
         self.create_registrants_tab()
+        self.create_schedule_tab()
         self.create_resources_tab()
 
-        # Create bottom button frame
+        # Create bottom button frame (reserves the bottom edge), then let the
+        # notebook expand into the remaining space.
         self.create_button_frame()
+        self.notebook.pack(
+            fill=tk.BOTH, expand=True, padx=self.px(10), pady=self.px(10)
+        )
+
+        # Scale inline fonts on all tk widgets created above (ttk uses styles).
+        self._scale_widget_fonts(self.root)
 
         # Bind window close event
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    def _resolve_ui_scale(self) -> float:
+        """Resolve the UI scale: env override > config > auto-detect (clamped)."""
+        self._ui_scale_setting = self.config.get("ui_scale")  # None = auto
+        value = None
+        env = os.environ.get("EVENT_MANAGER_UI_SCALE")
+        if env:
+            try:
+                value = float(env)
+            except ValueError:
+                value = None
+        if value is None and self._ui_scale_setting:
+            try:
+                value = float(self._ui_scale_setting)
+            except (TypeError, ValueError):
+                value = None
+        if value is None:
+            try:
+                value = self.root.winfo_fpixels("1i") / 96.0
+            except Exception:
+                value = 1.0
+        return max(1.0, min(4.0, value))
+
+    def _apply_ui_scaling(self) -> None:
+        """Apply the resolved scale to the window, named fonts, and Tk scaling.
+
+        Tk's ``tk scaling`` is unreliable for enlarging fonts on Linux/Xft, so we
+        pin it to a fixed 96-DPI baseline and instead scale font *sizes* explicitly
+        (named fonts here; ttk styles in setup_styles; inline tk widget fonts via
+        _scale_widget_fonts). Pinning the baseline avoids double-scaling.
+        """
+        self.root.tk.call("tk", "scaling", 96.0 / 72.0)
+
+        # Scale the default/named fonts (message boxes, menus, default widgets).
+        if self.ui_scale != 1.0:
+            for name in tkfont.names(self.root):
+                self._scale_font_object(tkfont.nametofont(name))
+
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+        w = min(self.px(1000), screen_w - 100)
+        h = min(self.px(850), screen_h - 100)
+        self.root.geometry(f"{w}x{h}")
+        self.root.minsize(min(self.px(900), w), min(self.px(750), h))
+
+    def _scale_font_object(self, f: tkfont.Font) -> None:
+        """Multiply a font's size by ui_scale (preserving point/pixel sign)."""
+        size = f.cget("size")
+        if size:
+            new = int(round(abs(size) * self.ui_scale))
+            f.configure(size=new if size > 0 else -new)
+
+    def _scaled_font_from_spec(self, spec: str):
+        """Build a scaled Font from a Tk font spec string (e.g. 'Ubuntu 12 bold').
+
+        Parses the integer size token out of the spec ourselves rather than asking
+        Tk to resolve it (unreliable when the family isn't installed). Returns a
+        cached Font, or None if no size is found.
+        """
+        cache = self.__dict__.setdefault("_scaled_font_cache", {})
+        if spec in cache:
+            return cache[spec]
+        try:
+            tokens = list(self.root.tk.splitlist(spec))
+        except tk.TclError:
+            return None
+        size_idx = next((i for i, t in enumerate(tokens) if _is_int(t)), None)
+        if size_idx is None or size_idx == 0:
+            return None
+        family = " ".join(tokens[:size_idx])
+        size = int(tokens[size_idx])
+        styles = [t.lower() for t in tokens[size_idx + 1:]]
+        new_size = int(round(abs(size) * self.ui_scale))
+        if size < 0:
+            new_size = -new_size
+        try:
+            f = tkfont.Font(
+                root=self.root, family=family, size=new_size,
+                weight="bold" if "bold" in styles else "normal",
+                slant="italic" if "italic" in styles else "roman",
+                underline="underline" in styles, overstrike="overstrike" in styles,
+            )
+        except tk.TclError:
+            return None
+        cache[spec] = f  # keep a ref alive (Font.__del__ deletes the Tcl font)
+        return f
+
+    def _scale_widget_fonts(self, widget) -> None:
+        """Recursively scale inline (non-named) fonts on tk widgets in a tree.
+
+        ttk widgets are font-styled via setup_styles and skipped here; widgets
+        using a named font are skipped (already scaled in _apply_ui_scaling).
+        """
+        if self.ui_scale == 1.0:
+            return
+        named = set(tkfont.names(self.root))
+
+        def walk(w):
+            try:
+                spec = str(w.cget("font"))
+            except tk.TclError:
+                spec = ""
+            if spec and spec not in named:
+                f = self._scaled_font_from_spec(spec)
+                if f is not None:
+                    try:
+                        w.configure(font=f)
+                    except tk.TclError:
+                        pass
+            for child in w.winfo_children():
+                walk(child)
+
+        walk(widget)
+
+    def px(self, n: float) -> int:
+        """Scale a pixel value by the current UI scale."""
+        return int(round(n * self.ui_scale))
+
+    def _bind_mousewheel(self, canvas) -> None:
+        """Enable mouse-wheel scrolling over a Canvas (Linux/X11 uses Button-4/5)."""
+        def on_wheel(event):
+            if getattr(event, "num", None) == 4:
+                canvas.yview_scroll(-1, "units")
+            elif getattr(event, "num", None) == 5:
+                canvas.yview_scroll(1, "units")
+            elif getattr(event, "delta", 0):
+                canvas.yview_scroll(int(-event.delta / 120), "units")
+
+        def _bind(_=None):
+            canvas.bind_all("<Button-4>", on_wheel)
+            canvas.bind_all("<Button-5>", on_wheel)
+            canvas.bind_all("<MouseWheel>", on_wheel)
+
+        def _unbind(_=None):
+            canvas.unbind_all("<Button-4>")
+            canvas.unbind_all("<Button-5>")
+            canvas.unbind_all("<MouseWheel>")
+
+        canvas.bind("<Enter>", _bind)
+        canvas.bind("<Leave>", _unbind)
 
     def setup_styles(self) -> None:
         """Configure custom styles for the application."""
@@ -578,11 +756,14 @@ class EventManagerApp:
         success = "#a6e3a1"  # Green
         border = "#45475a"  # Border color
 
-        # Font - using commonly available fonts on Linux
-        main_font = ("Ubuntu", 10)
-        main_font_bold = ("Ubuntu", 10, "bold")
-        header_font = ("Ubuntu", 12, "bold")
-        mono_font = ("Ubuntu Mono", 10)
+        # Font - using commonly available fonts on Linux (sizes scaled for HiDPI)
+        def _fs(pt: int) -> int:
+            return max(1, int(round(pt * self.ui_scale)))
+
+        main_font = ("Ubuntu", _fs(10))
+        main_font_bold = ("Ubuntu", _fs(10), "bold")
+        header_font = ("Ubuntu", _fs(12), "bold")
+        mono_font = ("Ubuntu Mono", _fs(10))
 
         # Configure notebook tab styling
         style.configure(
@@ -700,7 +881,7 @@ class EventManagerApp:
             fieldbackground=bg_surface,
             foreground=text_primary,
             borderwidth=0,
-            rowheight=24,
+            rowheight=self.px(24),
             font=main_font,
         )
         style.map(
@@ -963,12 +1144,7 @@ class EventManagerApp:
         canvas.configure(yscrollcommand=scrollbar.set)
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-
-        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
-        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+        self._bind_mousewheel(canvas)
 
         frame.columnconfigure(1, weight=1)
 
@@ -1469,6 +1645,15 @@ class EventManagerApp:
         self.hide_bracket_info.grid(row=row, column=1, sticky=tk.W, padx=5)
 
         row += 1
+        self.bracket_embed_entry = self.create_labeled_entry(
+            frame, "Bracket Embed URL (Challonge .../module):", row, results.get("bracket_embed_url", "")
+        )
+        row += 1
+        ttk.Label(frame, text="", foreground="#a6adc8").grid(row=row, column=0, sticky=tk.W, padx=5)
+        self.hide_bracket_embed_info = ttk.Label(frame, text="(Leave empty to hide this section)", foreground="#a6adc8")
+        self.hide_bracket_embed_info.grid(row=row, column=1, sticky=tk.W, padx=5)
+
+        row += 1
         self.show_results_placeholder_var = tk.BooleanVar(value=results.get("show_results_placeholder", True))
         ttk.Checkbutton(
             frame, text="Show placeholder text for results section", variable=self.show_results_placeholder_var
@@ -1727,7 +1912,7 @@ class EventManagerApp:
         )
         for c in cols:
             self.cert_tree.heading(c, text=headers[c])
-            self.cert_tree.column(c, width=widths[c], anchor=tk.W)
+            self.cert_tree.column(c, width=self.px(widths[c]), anchor=tk.W)
         self.cert_tree.tag_configure("unmatched", foreground="#f9e2af")
         self.cert_tree.tag_configure("certified", foreground="#a6e3a1")
         self.cert_tree.grid(row=0, column=0, sticky=tk.NSEW)
@@ -1814,7 +1999,7 @@ class EventManagerApp:
             ("hardware", "Hardware", 90),
         ):
             self.cert_nc_tree.heading(c, text=h)
-            self.cert_nc_tree.column(c, width=w, anchor=tk.W)
+            self.cert_nc_tree.column(c, width=self.px(w), anchor=tk.W)
         self.cert_nc_tree.grid(row=0, column=0, sticky=tk.NSEW)
         nc_scroll = ttk.Scrollbar(nc_frame, command=self.cert_nc_tree.yview)
         nc_scroll.grid(row=0, column=1, sticky=tk.NS)
@@ -2464,7 +2649,11 @@ class EventManagerApp:
     # ---- Generic modal form dialog ------------------------------------
 
     def _prompt_form(self, title: str, fields: list[tuple]) -> dict | None:
-        """Show a modal form. fields: list of (label, key, default, multiline)."""
+        """Show a modal form. fields: list of (label, key, default, kind).
+
+        ``kind`` is False for a single-line entry, True for a multi-line text box,
+        or a list of strings for an (editable) dropdown of choices.
+        """
         dialog = tk.Toplevel(self.root)
         dialog.title(title)
         dialog.configure(bg="#1e1e2e")
@@ -2472,31 +2661,36 @@ class EventManagerApp:
         dialog.grab_set()
         dialog.columnconfigure(1, weight=1)
 
-        widgets: dict[str, tk.Widget] = {}
-        for i, (label, key, default, multiline) in enumerate(fields):
+        widgets: dict[str, tuple] = {}
+        for i, (label, key, default, kind) in enumerate(fields):
             ttk.Label(dialog, text=label + ":").grid(
                 row=i, column=0, sticky=tk.NW, padx=8, pady=6
             )
-            if multiline:
+            if isinstance(kind, (list, tuple)):
+                w = ttk.Combobox(dialog, values=list(kind), width=42)
+                w.set(default)
+                widgets[key] = (w, "combo")
+            elif kind:
                 w = tk.Text(dialog, width=44, height=5, bg="#2a2a3c", fg="#cdd6f4",
                             insertbackground="#cdd6f4", relief=tk.FLAT,
                             highlightthickness=1, highlightbackground="#45475a",
                             font=("Ubuntu", 10))
                 w.insert("1.0", default)
+                widgets[key] = (w, "text")
             else:
                 w = tk.Entry(dialog, width=44, bg="#2a2a3c", fg="#cdd6f4",
                              insertbackground="#cdd6f4", relief=tk.FLAT,
                              highlightthickness=1, highlightbackground="#45475a",
                              font=("Ubuntu", 10))
                 w.insert(0, default)
+                widgets[key] = (w, "entry")
             w.grid(row=i, column=1, sticky=tk.EW, padx=8, pady=6)
-            widgets[key] = (w, multiline)
 
         result: dict = {}
 
         def on_ok():
-            for k, (w, ml) in widgets.items():
-                result[k] = w.get("1.0", tk.END).rstrip("\n") if ml else w.get()
+            for k, (w, kind) in widgets.items():
+                result[k] = w.get("1.0", tk.END).rstrip("\n") if kind == "text" else w.get()
             result["_ok"] = True
             dialog.destroy()
 
@@ -2510,8 +2704,302 @@ class EventManagerApp:
         )
         ttk.Button(btns, text="Cancel", command=on_cancel).pack(side=tk.LEFT, padx=4)
 
+        self._scale_widget_fonts(dialog)
         self.root.wait_window(dialog)
         return result if result.get("_ok") else None
+
+    # ------------------------------------------------------------------
+    # Schedule tab
+    # ------------------------------------------------------------------
+
+    def create_schedule_tab(self) -> None:
+        """Create the Schedule tab (groups + CSV import + booking-grid export)."""
+        frame = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(frame, text="Schedule")
+        frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(4, weight=1)  # groups list
+        frame.rowconfigure(6, weight=2)  # preview
+
+        # --- Settings -------------------------------------------------
+        settings = ttk.LabelFrame(frame, text="Schedule settings", padding=8)
+        settings.grid(row=0, column=0, sticky=tk.EW, pady=(0, 6))
+        ttk.Label(settings, text="Timezone label:").grid(row=0, column=0, sticky=tk.W, padx=5)
+        self.sched_tz_var = tk.StringVar(value=self.schedule_data.get("timezone_label", "ET"))
+        ttk.Entry(settings, textvariable=self.sched_tz_var, width=8).grid(row=0, column=1, padx=5)
+        ttk.Label(settings, text="Teams per group:").grid(row=0, column=2, sticky=tk.W, padx=(15, 5))
+        self.sched_group_size_var = tk.StringVar(value=str(self.schedule_data.get("group_size", 4)))
+        ttk.Entry(settings, textvariable=self.sched_group_size_var, width=5).grid(row=0, column=3, padx=5)
+        ttk.Button(settings, text="Auto-assign groups", command=self.sched_auto_assign).grid(
+            row=0, column=4, padx=(15, 5)
+        )
+
+        # --- Schedule CSV ---------------------------------------------
+        csv_frame = ttk.LabelFrame(frame, text="Schedule sheet (CSV exported from Google Sheets)", padding=8)
+        csv_frame.grid(row=1, column=0, sticky=tk.EW, pady=(0, 6))
+        csv_frame.columnconfigure(0, weight=1)
+        self.sched_csv_var = tk.StringVar(value=self.schedule_data.get("csv_path", ""))
+        ttk.Entry(csv_frame, textvariable=self.sched_csv_var).grid(row=0, column=0, sticky=tk.EW, padx=5)
+        ttk.Button(csv_frame, text="Browse", command=self.sched_browse_csv).grid(row=0, column=1, padx=5)
+
+        # --- Actions --------------------------------------------------
+        actions = ttk.Frame(frame)
+        actions.grid(row=2, column=0, sticky=tk.EW, pady=(0, 6))
+        ttk.Button(actions, text="Generate Preview", command=self.sched_preview,
+                   style="Accent.TButton").pack(side=tk.LEFT)
+        ttk.Button(actions, text="Import days from timeline", command=self.sched_import_days).pack(
+            side=tk.LEFT, padx=(8, 0)
+        )
+        ttk.Button(actions, text="Generate booking grid...", command=self.sched_generate_grid).pack(
+            side=tk.LEFT, padx=(8, 0)
+        )
+        ttk.Button(actions, text="Refresh teams", command=self._refresh_schedule_groups).pack(
+            side=tk.LEFT, padx=(8, 0)
+        )
+
+        # --- Group assignment (scrollable list of certified teams) ----
+        groups_box = ttk.LabelFrame(frame, text="Practice groups (certified teams)", padding=4)
+        groups_box.grid(row=3, column=0, sticky=tk.NSEW, pady=(0, 6))
+        groups_box.rowconfigure(0, weight=1)
+        groups_box.columnconfigure(0, weight=1)
+        gcanvas = tk.Canvas(groups_box, bg="#1e1e2e", highlightthickness=0, height=self.px(160))
+        gscroll = ttk.Scrollbar(groups_box, orient="vertical", command=gcanvas.yview)
+        self.sched_groups_inner = ttk.Frame(gcanvas)
+        self.sched_groups_inner.bind(
+            "<Configure>", lambda e: gcanvas.configure(scrollregion=gcanvas.bbox("all"))
+        )
+        gcanvas.create_window((0, 0), window=self.sched_groups_inner, anchor="nw")
+        gcanvas.configure(yscrollcommand=gscroll.set)
+        gcanvas.grid(row=0, column=0, sticky=tk.NSEW)
+        gscroll.grid(row=0, column=1, sticky=tk.NS)
+        self._bind_mousewheel(gcanvas)
+        self.sched_group_vars: dict[str, tk.StringVar] = {}
+
+        # --- Preview --------------------------------------------------
+        ttk.Label(frame, text="Preview (rendered markdown):").grid(row=4, column=0, sticky=tk.W, pady=(6, 0))
+        self.sched_preview_text = tk.Text(
+            frame, height=14, bg="#2a2a3c", fg="#cdd6f4", font=("Ubuntu Mono", 10),
+            relief=tk.FLAT, padx=10, pady=10, wrap=tk.NONE,
+        )
+        self.sched_preview_text.grid(row=5, column=0, sticky=tk.NSEW, pady=4)
+        sp_scroll = ttk.Scrollbar(frame, command=self.sched_preview_text.yview)
+        sp_scroll.grid(row=5, column=1, sticky=tk.NS)
+        self.sched_preview_text.config(yscrollcommand=sp_scroll.set)
+
+        self._refresh_schedule_groups()
+
+    def _schedule_teams(self) -> list:
+        """Certified teams for scheduling (fall back to candidates if none yet)."""
+        try:
+            teams = cert.teams_from_config(self.certification_data)
+        except Exception:
+            teams = []
+        certified = [t for t in teams if t.certified]
+        pool = certified if certified else [t for t in teams if t.is_candidate]
+        return sorted(pool, key=lambda t: t.display_name.lower())
+
+    def _refresh_schedule_groups(self) -> None:
+        for child in self.sched_groups_inner.winfo_children():
+            child.destroy()
+        self.sched_group_vars = {}
+        teams = self._schedule_teams()
+        groups = self.schedule_data.setdefault("groups", {})
+        if not teams:
+            ttk.Label(
+                self.sched_groups_inner,
+                text="No certified teams yet — certify teams on the Certification tab first.",
+                foreground="#a6adc8",
+            ).grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+            return
+        for i, team in enumerate(teams):
+            ttk.Label(self.sched_groups_inner, text=team.display_name).grid(
+                row=i, column=0, sticky=tk.W, padx=5, pady=2
+            )
+            var = tk.StringVar(value=groups.get(team.team_key, ""))
+            self.sched_group_vars[team.team_key] = var
+            combo = ttk.Combobox(
+                self.sched_groups_inner, textvariable=var, width=6,
+                values=[""] + [str(n) for n in range(1, 9)],
+            )
+            combo.grid(row=i, column=1, sticky=tk.W, padx=5, pady=2)
+            var.trace_add("write", lambda *a, k=team.team_key, v=var: self._sched_set_group(k, v))
+
+    def _sched_set_group(self, team_key: str, var: tk.StringVar) -> None:
+        groups = self.schedule_data.setdefault("groups", {})
+        val = var.get().strip()
+        if val:
+            groups[team_key] = val
+        else:
+            groups.pop(team_key, None)
+
+    def sched_auto_assign(self) -> None:
+        try:
+            size = int(self.sched_group_size_var.get().strip())
+        except ValueError:
+            messagebox.showwarning("Auto-assign", "Teams per group must be a number.")
+            return
+        self.schedule_data["group_size"] = size
+        keys = [t.team_key for t in self._schedule_teams()]
+        if not keys:
+            messagebox.showinfo("Auto-assign", "No certified teams to assign.")
+            return
+        self.schedule_data["groups"] = sched.auto_assign_groups(keys, size)
+        self._refresh_schedule_groups()
+
+    def sched_browse_csv(self) -> None:
+        filename = filedialog.askopenfilename(
+            title="Select schedule CSV",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            initialdir=SCRIPT_DIR,
+        )
+        if filename:
+            self.sched_csv_var.set(filename)
+            self.schedule_data["csv_path"] = filename
+
+    @staticmethod
+    def _override_to_iso(text: str, year: str) -> str:
+        """Best-effort parse a free-text date override (e.g. 'June 22nd') to ISO.
+
+        Falls back to the original text if it can't be parsed.
+        """
+        t = re.sub(r"(\d+)(st|nd|rd|th)\b", r"\1", text, flags=re.IGNORECASE).strip(" ,")
+        candidates = [t]
+        if year and year not in t:
+            candidates.append(f"{t} {year}")
+        formats = ("%Y-%m-%d", "%B %d %Y", "%b %d %Y", "%d %B %Y", "%m/%d/%Y", "%B %d", "%b %d")
+        for cand in candidates:
+            for fmt in formats:
+                try:
+                    dt = datetime.strptime(cand, fmt)
+                    if dt.year == 1900 and year:  # format had no year
+                        dt = dt.replace(year=int(year))
+                    return dt.strftime("%Y-%m-%d")
+                except (ValueError, TypeError):
+                    continue
+        return text
+
+    def _timeline_days(self) -> list[tuple[str, str]]:
+        """Resolve enabled competition days to (label, ISO date) from the config."""
+        cfg = self.collect_config()
+        dcfg = cfg.get("dates", {})
+        comp = cfg.get("competition_days", {})
+        year = cfg.get("event", {}).get("year", "")
+        try:
+            calc = calculate_dates(dcfg.get("race_day", ""), dcfg.get("offsets", {}))
+        except Exception:
+            calc = {}
+        defs = [
+            ("track_setup", "Track Setup"),
+            ("team_training", "Team Training"),
+            ("qualification", "Qualification / Time Trials"),
+            ("race", "Race Day"),
+        ]
+        out = []
+        for key, label in defs:
+            dc = comp.get(key, {})
+            if not dc.get("enabled", False):
+                continue
+            override = (dc.get("date_override", "") or "").strip()
+            if override:
+                date_str = self._override_to_iso(override, year)
+            else:
+                dt = calc.get(key)
+                date_str = dt.strftime("%Y-%m-%d") if dt else ""
+            out.append((label, date_str))
+        return out
+
+    def sched_import_days(self) -> None:
+        """Pull the competition days straight from the event manager (no file)."""
+        days = self._timeline_days()
+        if not days:
+            messagebox.showinfo(
+                "Import days from timeline",
+                "No enabled competition days found. Configure them on the "
+                "Competition Days tab first.",
+            )
+            return
+        self.schedule_data["days"] = [
+            {"label": label, "date": date} for label, date in days
+        ]
+        self.sched_preview()
+        messagebox.showinfo(
+            "Import days from timeline",
+            "Imported these days from the event timeline:\n\n"
+            + "\n".join(f"  - {label}: {date or '(no date set)'}" for label, date in days)
+            + "\n\nThey now appear as day sections in the schedule.",
+        )
+
+    def sched_generate_grid(self) -> None:
+        days = self._timeline_days()
+        date_choices = [d for _, d in days if d]
+        result = self._prompt_form(
+            "Generate booking grid",
+            [
+                ("Session name", "session", "Regulated Practice", False),
+                ("Date", "date", date_choices[0] if date_choices else "", date_choices or [""]),
+                ("Start (HH:MM)", "start", "11:00", False),
+                ("End (HH:MM, optional)", "end", "13:00", False),
+                ("Slot minutes", "slot", "10", False),
+                ("Slot count (optional)", "count", "", False),
+                ("Switch buffer minutes", "switch", "0", False),
+                ("Group (optional)", "group", "", False),
+            ],
+        )
+        if not result:
+            return
+        try:
+            slot = int(result["slot"])
+            switch = int(result["switch"] or 0)
+            count = int(result["count"]) if result["count"].strip() else None
+            rows = sched.generate_slot_grid(
+                result["date"], result["start"], result["end"], slot,
+                result["session"], count=count, switch_minutes=switch,
+                group=result["group"].strip(),
+            )
+        except Exception as e:
+            messagebox.showerror("Generate booking grid", f"Could not generate grid: {e}")
+            return
+        if not rows:
+            messagebox.showinfo("Generate booking grid", "No slots produced — check the times/count.")
+            return
+        path = filedialog.asksaveasfilename(
+            title="Save booking grid CSV",
+            defaultextension=".csv",
+            initialfile="booking_grid.csv",
+            initialdir=SCRIPT_DIR,
+        )
+        if not path:
+            return
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(sched.rows_to_csv(rows))
+        messagebox.showinfo(
+            "Generate booking grid",
+            f"Wrote {len(rows)} empty slot(s) to:\n{path}\n\n"
+            "Paste these rows into your schedule sheet; teams fill the Team column.",
+        )
+
+    def sched_preview(self) -> None:
+        self.schedule_data["timezone_label"] = self.sched_tz_var.get().strip() or "ET"
+        self.schedule_data["csv_path"] = self.sched_csv_var.get().strip()
+        teams = self._schedule_teams()
+        display = {t.team_key: t.display_name for t in teams}
+        groups_md = sched.render_groups_markdown(self.schedule_data.get("groups", {}), display)
+        rows = []
+        path = self.schedule_data["csv_path"]
+        if path and Path(path).exists():
+            try:
+                rows = sched.load_schedule_csv(path)
+            except Exception as e:
+                messagebox.showerror("Preview", f"Could not parse schedule CSV: {e}")
+                return
+        schedule_md = sched.render_schedule_markdown(
+            rows, self.schedule_data["timezone_label"], days=self.schedule_data.get("days", [])
+        )
+        body = "\n\n".join(p for p in (groups_md, schedule_md) if p)
+        self.sched_preview_text.delete("1.0", tk.END)
+        self.sched_preview_text.insert(
+            "1.0",
+            body or "(nothing to preview — assign groups, import days, and/or select a schedule CSV)",
+        )
 
     def create_resources_tab(self) -> None:
         """Create the Resources tab for adding custom Markdown to race_resources.md."""
@@ -2563,7 +3051,8 @@ class EventManagerApp:
     def create_button_frame(self) -> None:
         """Create the bottom button frame."""
         frame = ttk.Frame(self.root)
-        frame.pack(fill=tk.X, padx=10, pady=15)
+        # side=BOTTOM so the row always keeps its space below the notebook.
+        frame.pack(side=tk.BOTTOM, fill=tk.X, padx=self.px(10), pady=self.px(15))
 
         # Left side - main actions
         left_frame = tk.Frame(frame, bg="#1e1e2e")
@@ -2975,6 +3464,7 @@ class EventManagerApp:
             "results": {
                 "time_trial_sheet_link": self.time_trial_entry.get().strip(),
                 "bracket_link": self.bracket_entry.get().strip(),
+                "bracket_embed_url": self.bracket_embed_entry.get().strip(),
                 "youtube_stream_id": self.youtube_stream_entry.get().strip(),
                 "twitch_parent_domains": twitch_domains,
                 "show_stream_placeholder": self.show_stream_placeholder_var.get(),
@@ -3000,6 +3490,8 @@ class EventManagerApp:
             "organizers": self.organizers_data,
             "extra_resources": self.extra_resources_text.get("1.0", tk.END).rstrip("\n"),
             "certification": self.certification_data,
+            "schedule": self.schedule_data,
+            "ui_scale": self._ui_scale_setting,
         }
 
     def save_config(self) -> None:
@@ -3078,7 +3570,10 @@ class RepositoryUpdater:
         """Replace content between <!-- NAME --> and <!-- /NAME --> markers."""
         pattern = rf'<!-- {name} -->.*?<!-- /{name} -->'
         replacement = f'<!-- {name} -->{value}<!-- /{name} -->'
-        return re.sub(pattern, replacement, content, flags=re.DOTALL)
+        # Replace via a function so backslashes and \1 / \g<0> style sequences in
+        # user-entered config values are emitted literally instead of being read
+        # as re template escapes.
+        return re.sub(pattern, lambda _match: replacement, content, flags=re.DOTALL)
 
     @staticmethod
     def _clean_html(html: str) -> str:
@@ -3116,6 +3611,8 @@ class RepositoryUpdater:
             "roboracer_resources.md",
             "orientation_1.md",
             "orientation_2.md",
+            "race_schedule.md",
+            "_layouts/page.html",
         ]
 
         for filename in html_files:
@@ -3175,10 +3672,16 @@ class RepositoryUpdater:
                 content = self._update_registration_html(content)
             elif filepath.name == "results.md":
                 content = self._update_results_html(content)
+            elif filepath.name == "roboracer_resources.md":
+                content = self._update_roboracer_resources_html(content)
             elif filepath.name == "orientation_1.md":
                 content = self._update_orientation1_html(content)
             elif filepath.name == "orientation_2.md":
                 content = self._update_orientation2_html(content)
+            elif filepath.name == "race_schedule.md":
+                content = self._update_schedule_html(content)
+            elif filepath.name == "page.html":
+                content = self._update_page_layout_html(content)
 
             if content != original_content:
                 with open(filepath, "w", encoding="utf-8") as f:
@@ -3486,35 +3989,37 @@ class RepositoryUpdater:
     def _certified_participant_rows(self) -> str:
         """Build participant <tr> rows for certified teams from certification config.
 
-        Returns an empty string if the CSVs aren't configured/available so the
-        participants table simply renders empty (unchanged behaviour).
+        Returns an empty string if nothing is configured so the participants
+        table simply renders empty (unchanged behaviour).
         """
-        certc = self.config.get("certification", {})
-        paths = certc.get("csv_paths", {})
-        reg_p = paths.get("registration", "")
-        vid_p = paths.get("video", "")
-        hw_p = paths.get("hardware", "")
-        manual_teams = certc.get("manual_teams", [])
-        have_csvs = all(
-            p and Path(p).exists() for p in (reg_p, vid_p, hw_p)
-        )
-        # Nothing to render if there are neither CSVs nor manual teams.
-        if not have_csvs and not manual_teams:
-            return ""
         try:
-            regs = cert.load_registrations(reg_p) if have_csvs else []
-            videos = cert.load_video_submissions(vid_p) if have_csvs else []
-            hardware = cert.load_hardware_submissions(hw_p) if have_csvs else []
-            teams = cert.build_teams(
-                regs, videos, hardware,
-                overrides=certc.get("overrides", {}),
-                ticks=certc.get("ticks", {}),
-                member_overrides=certc.get("member_overrides", {}),
-                manual_teams=certc.get("manual_teams", []),
-            )
+            teams = cert.teams_from_config(self.config.get("certification", {}))
             return cert.render_participant_rows(teams)
         except Exception:
             return ""
+
+    def _update_schedule_html(self, content: str) -> str:
+        """Fill the SCHEDULE placeholder with group rosters + the timetable."""
+        certc = self.config.get("certification", {})
+        sch_cfg = self.config.get("schedule", {})
+        try:
+            teams = cert.teams_from_config(certc)
+            display = {t.team_key: t.display_name for t in teams}
+            groups_md = sched.render_groups_markdown(
+                sch_cfg.get("groups", {}), display
+            )
+            csv_path = sch_cfg.get("csv_path", "")
+            rows = []
+            if csv_path and Path(csv_path).exists():
+                rows = sched.load_schedule_csv(csv_path)
+            schedule_md = sched.render_schedule_markdown(
+                rows, sch_cfg.get("timezone_label", "ET"), days=sch_cfg.get("days", [])
+            )
+            body = "\n\n".join(p for p in (groups_md, schedule_md) if p)
+            block = f"\n{body}\n" if body else ""
+            return self.replace_placeholder(content, "SCHEDULE", block)
+        except Exception:
+            return content
 
     def _update_registration_html(self, content: str) -> str:
         """Update registration.html using placeholder markers."""
@@ -3650,6 +4155,32 @@ class RepositoryUpdater:
             bracket_section = ''  # Hide entire section
         content = self.replace_placeholder(content, "BRACKET_SECTION", bracket_section)
 
+        # Update bracket embed (e.g. Challonge ".../module" widget) - hide if no URL
+        bracket_embed_url = self.results.get("bracket_embed_url", "")
+        if bracket_embed_url:
+            bracket_embed = f'<iframe src="{bracket_embed_url}" width="100%" height="500" frameborder="0" scrolling="auto" allowtransparency="true"></iframe>'
+        else:
+            bracket_embed = ''  # Hide entire section
+        content = self.replace_placeholder(content, "BRACKET_EMBED", bracket_embed)
+
+        return content
+
+    def _update_roboracer_resources_html(self, content: str) -> str:
+        """Update roboracer_resources.md using placeholder markers."""
+        # AutoDRIVE Simulator sentence - only mention the Sim Racing League when
+        # there is one to link to. Both variants end with "...racing algorithms"
+        # so the trailing clause outside the marker still reads correctly.
+        sim_url = self.sim.get("website_url", "")
+        if self.sim.get("enabled", False) and sim_url:
+            sim_sentence = (
+                f'This simulator will be used for the <a href="{sim_url}">Roboracer '
+                f'Sim Racing League</a>, but you can also use it to prototype your '
+                f'autonomous racing algorithms'
+            )
+        else:
+            sim_sentence = "This simulator can be used to prototype your autonomous racing algorithms"
+        content = self.replace_placeholder(content, "SIM_LEAGUE_SENTENCE", sim_sentence)
+
         return content
 
     def _update_orientation1_html(self, content: str) -> str:
@@ -3672,6 +4203,20 @@ class RepositoryUpdater:
         """Update orientation_2.html using placeholder markers."""
         # The CONF_WITH_YEAR placeholder is already handled in the common section
         # O2_CONTENT can be updated when slides/video are available
+        return content
+
+    def _update_page_layout_html(self, content: str) -> str:
+        """Update _layouts/page.html using placeholder markers."""
+        # The markers must stay OUTSIDE <title>: it is an RCDATA element, so a
+        # comment written inside it renders as literal text in the browser tab.
+        # The Liquid suffix is part of the emitted value, hence the plain (non-f)
+        # second string so the {{ }} braces are not read as f-string fields.
+        page_title = (
+            f'<title>Roboracer {self.conf_with_year} | '
+            '{{ page.short_title | default: page.title | escape }}</title>'
+        )
+        content = self.replace_placeholder(content, "LAYOUT_PAGE_TITLE", page_title)
+
         return content
 
     def update_md_file(self, filepath: Path) -> str:

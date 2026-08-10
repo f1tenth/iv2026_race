@@ -520,6 +520,33 @@ def _latest(subs: list[Submission]) -> Submission | None:
     return max(subs, key=lambda s: (s.timestamp or datetime.min))
 
 
+def teams_from_config(certc: dict) -> list[Team]:
+    """Build the Team list straight from a ``certification`` config dict.
+
+    Loads the configured CSVs (if present) plus any manual teams, applying the
+    saved overrides/ticks/member edits. Returns ``[]`` when there is nothing to
+    build. Shared by the apply path and the Schedule tab.
+    """
+    paths = certc.get("csv_paths", {})
+    reg_p = paths.get("registration", "")
+    vid_p = paths.get("video", "")
+    hw_p = paths.get("hardware", "")
+    manual = certc.get("manual_teams", [])
+    have_csvs = all(p and Path(p).exists() for p in (reg_p, vid_p, hw_p))
+    if not have_csvs and not manual:
+        return []
+    regs = load_registrations(reg_p) if have_csvs else []
+    videos = load_video_submissions(vid_p) if have_csvs else []
+    hardware = load_hardware_submissions(hw_p) if have_csvs else []
+    return build_teams(
+        regs, videos, hardware,
+        overrides=certc.get("overrides", {}),
+        ticks=certc.get("ticks", {}),
+        member_overrides=certc.get("member_overrides", {}),
+        manual_teams=manual,
+    )
+
+
 def manual_team_to_registration(entry: dict) -> Registration:
     """Build a synthetic Registration from a manually-added team dict."""
     members = [tuple(m) for m in entry.get("members", [])]
